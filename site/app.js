@@ -1094,9 +1094,19 @@ $('#toggle-right').addEventListener('click', () => document.body.classList.toggl
 // ---------- start ----------
 
 renderRail();
+// The legend floats over the page from the bottom-left corner: its button, the ×, Esc or a click elsewhere closes it.
 const legend = $('#legend');
-legend.open = local.get('legend') === '1';
-legend.addEventListener('toggle', () => local.set('legend', legend.open ? '1' : '0'));
+const legendBtn = $('#legend-btn');
+function setLegend(open) {
+  legend.hidden = !open;
+  legendBtn.setAttribute('aria-expanded', open);
+}
+legendBtn.addEventListener('click', () => setLegend(legend.hidden));
+$('#legend-close').addEventListener('click', () => { setLegend(false); legendBtn.focus(); });
+document.addEventListener('click', (e) => {
+  if (!legend.hidden && !e.target.closest('#legend, #legend-btn')) setLegend(false);
+});
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !legend.hidden) setLegend(false); });
 showTab(local.get('tab') || 'toc');
 syncPins();
 renderTree();

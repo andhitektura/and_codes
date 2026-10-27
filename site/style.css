@@ -735,18 +735,31 @@ a.st-bad, .row.st-bad a { color: var(--dim) !important; }
 
 /* ───────────── legend, bottom left ───────────── */
 
-.legend {
-  padding: 2mm 3mm 3mm;
-  background: var(--bg-2); border: 2px solid var(--line); border-radius: 4px 12px 12px 12px;
-  font-size: 3.2mm;
-}
-.legend summary {
-  cursor: pointer; list-style: none; display: flex; align-items: center; gap: 2mm;
+.legend-btn {
+  display: inline-flex; align-items: center; gap: 2mm; margin: 1mm 0 0 1mm; padding: 1.5mm 3.5mm 1.5mm 2.5mm;
+  border: 2px solid var(--line); border-radius: 999px; background: var(--bg-2); cursor: pointer;
   font-size: 2.9mm; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; color: var(--mute);
 }
-.legend summary::-webkit-details-marker { display: none; }
-.legend summary::before { content: '+'; color: var(--yellow); font-size: 4mm; line-height: 1; transition: rotate 0.2s; }
-.legend[open] summary::before { rotate: 45deg; }
+.legend-btn::before { content: '+'; color: var(--yellow); font-size: 4mm; line-height: 1; transition: rotate 0.2s; }
+.legend-btn[aria-expanded="true"] { border-color: var(--ink); color: var(--ink); }
+.legend-btn[aria-expanded="true"]::before { rotate: 45deg; }
+.legend-btn:hover { color: var(--ink); }
+.legend {
+  /* floats over the page from the bottom-left corner */
+  position: fixed; left: 6mm; bottom: 16mm; z-index: 45;
+  width: min(84mm, calc(100vw - 12mm)); max-height: calc(100vh - var(--top-h) - 24mm); overflow: auto;
+  padding: 3mm 4mm 4mm;
+  background: var(--bg-2); border: 2px solid var(--ink); border-radius: 4px 12px 12px 12px;
+  box-shadow: 0 18px 50px rgb(0 0 0 / 0.55);
+  font-size: 3.2mm;
+  animation: legend-in 0.25s var(--ease);
+}
+@keyframes legend-in { from { opacity: 0; translate: 0 3mm; } }
+.legend-head {
+  display: flex; align-items: center; justify-content: space-between;
+  font-size: 2.9mm; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; color: var(--ink);
+}
+.legend-head .act { width: 6.5mm; height: 6.5mm; }
 .legend dl { margin: 2mm 0 0; display: grid; gap: 0.6mm; }
 .legend dt { margin-top: 1.5mm; font-size: 2.6mm; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: var(--dim); }
 .legend dd { margin: 0; display: flex; align-items: center; gap: 2mm; color: var(--mute); line-height: 1.3; }

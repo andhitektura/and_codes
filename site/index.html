@@ -19,28 +19,7 @@
       <ol class="themes" id="themes"></ol>
       <div class="rail-foot">
       <div class="rail-about" id="rail-about"></div>
-      <details class="legend" id="legend">
-        <summary>Легенда</summary>
-        <dl>
-          <dt>Акт</dt>
-          <dd><span class="lg-dot st-ok"></span>важечки</dd>
-          <dd><span class="lg-dot st-warn"></span>за проверка</dd>
-          <dd><span class="lg-dot st-bad"></span>престанал да важи</dd>
-          <dd><span class="lg-dot"></span>повлечен запис</dd>
-          <dt>Член</dt>
-          <dd><span class="lg-sym lg-here">+ Член 59</span>членот што го читаш</dd>
-          <dd><span class="lg-sym lg-del">Член 49</span>избришан или укинат</dd>
-          <dd><span class="lg-sym">А</span>проверен дословно според еден извор</dd>
-          <dd><span class="lg-sym">Б</span>проверен според официјален пречистен текст</dd>
-          <dd><span class="lg-sym">В</span>верижна примена на измени</dd>
-          <dt>Врски</dt>
-          <dd><span class="lg-sym lg-out">→</span>упатува на</dd>
-          <dd><span class="lg-sym lg-in">←</span>упатено од</dd>
-          <dd><span class="lg-sym">↻</span>веќе е во гранката</dd>
-          <dd><span class="lg-sym lg-fn">[12]</span>фуснота со историја на измени</dd>
-          <dd><span class="lg-sym lg-broken">ИНСТРУКЦИЈА</span>необјавена белешка</dd>
-        </dl>
-      </details>
+      <button class="legend-btn" id="legend-btn" type="button" aria-expanded="false" aria-controls="legend">Легенда</button>
       </div>
     </nav>
 
@@ -87,6 +66,28 @@
     </aside>
   </div>
 
+  <aside class="legend" id="legend" role="dialog" aria-label="Легенда" hidden>
+    <div class="legend-head"><span>Легенда</span><button class="act" id="legend-close" type="button" aria-label="Затвори" title="Затвори"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
+    <dl>
+          <dt>Акт</dt>
+          <dd><span class="lg-dot st-ok"></span>важечки</dd>
+          <dd><span class="lg-dot st-warn"></span>за проверка</dd>
+          <dd><span class="lg-dot st-bad"></span>престанал да важи</dd>
+          <dd><span class="lg-dot"></span>повлечен запис</dd>
+          <dt>Член</dt>
+          <dd><span class="lg-sym lg-here">+ Член 59</span>членот што го читаш</dd>
+          <dd><span class="lg-sym lg-del">Член 49</span>избришан или укинат</dd>
+          <dd><span class="lg-sym">А</span>проверен дословно според еден извор</dd>
+          <dd><span class="lg-sym">Б</span>проверен според официјален пречистен текст</dd>
+          <dd><span class="lg-sym">В</span>верижна примена на измени</dd>
+          <dt>Врски</dt>
+          <dd><span class="lg-sym lg-out">→</span>упатува на</dd>
+          <dd><span class="lg-sym lg-in">←</span>упатено од</dd>
+          <dd><span class="lg-sym">↻</span>веќе е во гранката</dd>
+          <dd><span class="lg-sym lg-fn">[12]</span>фуснота со историја на измени</dd>
+          <dd><span class="lg-sym lg-broken">ИНСТРУКЦИЈА</span>необјавена белешка</dd>
+        </dl>
+  </aside>
   <div id="popovers"></div>
   <div id="toast" class="toast" role="status" hidden></div>
   <script type="module" src="app.js"></script>
