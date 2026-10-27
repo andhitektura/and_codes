@@ -243,6 +243,7 @@ async function route() {
   closePopovers(0);
   document.body.classList.remove('show-left', 'show-right');
   const { i, anchor, home } = parseHash();
+  document.body.dataset.view = home ? 'home' : 'note';
   if (home) {
     current = { i: null, anchor: '', home: true };
     renderHome();
@@ -954,7 +955,6 @@ function renderHome() {
   const totalUnits = list.reduce((s, t) => s + t.units, 0);
   main.innerHTML = `<div class="home">
     <div class="eyebrow"><span>Прописи</span><span>Членови</span><span>Врски</span><span>Белешки</span></div>
-    <h1>and_codes</h1>
     <p class="lead">Консолидираните прописи на студиото: ${plural(totalActs, 'акт', 'акти')} и ${plural(totalUnits, 'член', 'членови')}, секој член со своите врски. Лебди врз упатување за преглед, закачи членови во сесијата и следи ги врските во дрвото.</p>
     <div class="home-start">${start.map((r) => `
       <a class="tile tile-start" href="${hrefOf(r.i)}" style="--accent:${r.accent}">
