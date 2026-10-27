@@ -983,7 +983,8 @@ const resultsBox = $('#search-results');
 let pf = null;
 let searchSeq = 0;
 let activeResult = -1;
-const searchState = { theme: '', archive: false };
+const searchState = { theme: '', archive: false, act: '' };
+const actByCode = new Map(acts.map((a, ai) => [a.c, ai]));
 
 async function ensureSearch() {
   if (pf) return pf;
@@ -999,26 +1000,60 @@ async function ensureSearch() {
 async function runSearch() {
   const q = searchInput.value.trim();
   const seq = ++searchSeq;
-  if (!q) { $('#search-list').innerHTML = ''; resultsBox.hidden = !document.activeElement?.closest('.search-wrap'); return; }
+  if (!q) { $('#search-list').innerHTML = ''; $('#search-tags').innerHTML = ''; resultsBox.hidden = !document.activeElement?.closest('.search-wrap'); return; }
   resultsBox.hidden = false;
   await ensureSearch();
   const filters = {};
   if (searchState.theme) filters['тема'] = searchState.theme;
   if (!searchState.archive) filters['вид'] = { none: ['архива'] };
+  if (searchState.act) filters['акт'] = searchState.act;
   const search = await pf.search(q, { filters });
   if (seq !== searchSeq) return;
   const top = await Promise.all(search.results.slice(0, 30).map((r) => r.data()));
   if (seq !== searchSeq) return;
   activeResult = -1;
+  renderSearchTags(top);
   $('#search-list').innerHTML = top.length
     ? top.map((r) => {
-        const u = decodeURIComponent(r.url.replace(/^#\//, ''));
-        const i = byU.get(u);
-        return `<a class="result wl" href="${esc(r.url)}" ${i != null ? `data-k="${i}"` : ''}>
+        const i = resultNote(r);
+        return `<a class="result wl" href="${esc(resultHash(r))}" ${i != null ? `data-k="${i}"` : ''}>
           <span class="rt">${esc(r.meta.title)}</span>${r.meta.act ? `<span class="ra">${esc(r.meta.act)}</span>` : ''}<span class="rs">${r.excerpt}</span></a>`;
       }).join('') + (search.results.length > 30 ? `<div class="more">+ уште ${search.results.length - 30} — стесни го пребарувањето</div>` : '')
     : '<div class="more">Нема резултати.</div>';
 }
+
+// Pagefind reports a record's URL with a leading "/" ("/#/ГР-01-Член 59"); the site's links are relative ("#/…"),
+// so it also works under a sub-path such as /and_codes/.
+const resultHash = (r) => r.url.slice(Math.max(0, r.url.indexOf('#')));
+const resultNote = (r) => byU.get(decodeURIComponent(resultHash(r).replace(/^#\//, '')));
+
+/** The acts in the results as tags, code and name: a legend for the codes, and a filter by act. */
+function renderSearchTags(results) {
+  const seen = [];
+  for (const r of results) {
+    const i = resultNote(r);
+    const ai = i != null ? N[i].act : -1;
+    if (ai >= 0 && !seen.includes(ai)) seen.push(ai);
+  }
+  if (searchState.act && !seen.includes(actByCode.get(searchState.act))) seen.unshift(actByCode.get(searchState.act));
+  $('#search-tags').innerHTML = seen.slice(0, 10).map((ai) => {
+    const a = acts[ai];
+    const t = themeOf(N[a.m]);
+    const on = searchState.act === a.c;
+    return `<span class="stag${on ? ' is-on' : ''}" style="--accent:${t ? t.accent : 'var(--ink)'}">
+      <button type="button" data-search-act="${esc(a.c)}" aria-pressed="${on}" title="${on ? 'Сите акти' : 'Само во ' + esc(a.c)}"><b>${esc(a.c)}</b> ${esc(a.t)}</button>
+      <a href="${hrefOf(a.m)}" title="Отвори го актот" aria-label="Отвори го ${esc(a.c)}">→</a>
+    </span>`;
+  }).join('');
+}
+$('#search-tags').addEventListener('click', (e) => {
+  const b = e.target.closest('[data-search-act]');
+  if (!b) return;
+  e.stopPropagation();
+  searchState.act = searchState.act === b.dataset.searchAct ? '' : b.dataset.searchAct;
+  runSearch();
+  searchInput.focus();
+});
 
 let searchTimer = null;
 searchInput.addEventListener('focus', () => { ensureSearch(); if (searchInput.value.trim()) resultsBox.hidden = false; });

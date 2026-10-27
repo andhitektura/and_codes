@@ -401,7 +401,7 @@ for (const n of notes) {
       content: content || n.label,
       language: config.language || 'mk',
       meta: { title: prefix + n.label, ...(act && n.kind !== 'master' ? { act: act.name } : {}) },
-      filters: { вид: [config.searchKinds?.[n.kind] || n.kind], тема: [themeOf(n)] },
+      filters: { вид: [config.searchKinds?.[n.kind] || n.kind], тема: [themeOf(n)], ...(act ? { акт: [act.code] } : {}) },
     });
   }
 }

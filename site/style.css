@@ -76,7 +76,7 @@ svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width:
   overflow-y: auto;
   scrollbar-width: thin;
   scrollbar-color: var(--line) transparent;
-  padding: 0 4mm 4mm 0;
+  padding: 0 4mm 0 0;
 }
 .brand {
   font-size: 7mm;
@@ -119,7 +119,7 @@ svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width:
 .rail-foot {
   /* the bottom-left corner: the notes about the vault and the legend, always in view */
   position: sticky; bottom: 0; z-index: 5;
-  margin: 6mm 0 0 6mm; padding: 3mm 0 0;
+  margin: 6mm 0 0 6mm; padding: 3mm 0 8mm; /* 8mm: the corner logo's distance from the bottom edge */
   background: linear-gradient(to bottom, transparent, var(--bg) 3mm);
 }
 .rail-about { padding: 0 0 2mm 1mm; }
@@ -349,6 +349,25 @@ svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width:
 }
 .search-filters label { display: inline-flex; gap: 2mm; align-items: center; cursor: pointer; }
 .search-filters input { accent-color: var(--yellow); }
+/* the acts in the results, as a legend of their codes and a filter */
+.search-tags { display: flex; flex-wrap: wrap; gap: 1.5mm; padding: 0 1mm 2.5mm; }
+.search-tags:empty { display: none; }
+.stag {
+  display: inline-flex; align-items: stretch; max-width: 100%;
+  border: 1.5px solid var(--line); border-radius: 999px; overflow: hidden; font-size: 3.1mm; line-height: 1.2;
+}
+.stag button {
+  display: inline-flex; align-items: center; gap: 1.5mm; min-width: 0; padding: 1mm 1.5mm 1mm 2.5mm;
+  border: 0; background: none; cursor: pointer; color: var(--mute); text-align: left;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 80mm;
+}
+.stag button::before { content: ''; flex: none; width: 1.8mm; height: 1.8mm; border-radius: 50%; background: var(--accent); }
+.stag b { color: var(--ink); flex: none; }
+.stag a { display: inline-grid; place-items: center; padding: 0 2mm; color: var(--dim); text-decoration: none; border-left: 1px solid var(--line); }
+.stag:hover { border-color: var(--mute); }
+.stag button:hover, .stag a:hover { color: var(--ink); background: var(--bg-3); }
+.stag.is-on { border-color: var(--accent); background: var(--bg-3); }
+.stag.is-on button { color: var(--ink); }
 .result { display: block; padding: 2.5mm 3mm; border-radius: 6px; text-decoration: none; color: var(--ink); }
 .result:hover, .result.active { background: var(--bg-3); }
 .result .rt { display: block; font-weight: 700; font-size: 4mm; line-height: 1.25; }
@@ -734,7 +753,7 @@ a.st-bad, .row.st-bad a { color: var(--dim) !important; }
 /* ───────────── legend, bottom left ───────────── */
 
 .legend-btn {
-  display: inline-flex; align-items: center; gap: 2mm; margin: 1mm 0 0 1mm; padding: 1.5mm 3.5mm 1.5mm 2.5mm;
+  display: inline-flex; align-items: center; gap: 2mm; margin: 1mm 0 0 1mm; padding: 0 3.5mm 0 2.5mm; height: 9mm;
   border: 2px solid var(--line); border-radius: 999px; background: var(--bg-2); cursor: pointer;
   font-size: 2.9mm; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; color: var(--mute);
 }
@@ -744,7 +763,7 @@ a.st-bad, .row.st-bad a { color: var(--dim) !important; }
 .legend-btn:hover { color: var(--ink); }
 .legend {
   /* floats over the page from the bottom-left corner */
-  position: fixed; left: 6mm; bottom: 16mm; z-index: 45;
+  position: fixed; left: 7mm; bottom: 8mm; z-index: 45; /* opens on the legend button's baseline, level with the logo */
   width: min(84mm, calc(100vw - 12mm)); max-height: calc(100vh - var(--top-h) - 24mm); overflow: auto;
   padding: 3mm 4mm 4mm;
   background: var(--bg-2); border: 2px solid var(--ink); border-radius: 4px 12px 12px 12px;
