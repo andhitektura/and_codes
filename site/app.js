@@ -889,23 +889,36 @@ function renderRail() {
     <ul class="about-list">${about.map((r) => `<li><a href="${hrefOf(r.i)}" data-i="${r.i}">${esc(r.label)}</a></li>`).join('')}</ul>` : '';
   $('#themes').innerHTML = themes.filter((t) => t.country === railCountry).map((t) => `
     <li class="theme" data-theme="${esc(t.dir)}" style="--accent:${t.accent}">
-      <a class="th-head" href="${t.moc != null ? hrefOf(t.moc) : '#/'}" data-theme-head="${esc(t.dir)}">
-        <span class="th-num">${esc(t.num)}</span><span class="th-dot"></span><span class="th-name">${esc(t.name)}</span>
-      </a>
-      <div class="th-body">${[...t.groups.entries()].map(([g, list]) => `
+      <button class="th-head" type="button" data-theme-head="${esc(t.dir)}" aria-expanded="false">
+        <span class="th-num">${esc(t.num)}</span><span class="th-dot"></span><span class="th-name">${esc(t.name)}</span><span class="th-chev" aria-hidden="true"></span>
+      </button>
+      <div class="th-body">
+        ${t.moc != null ? `<a class="th-overview" href="${hrefOf(t.moc)}" data-i="${t.moc}">Преглед на темата</a>` : ''}${[...t.groups.entries()].map(([g, list]) => `
         ${g ? `<p class="grp-label">${esc(g)}</p>` : ''}
         <ul class="act-list">${list.map(actCard).join('')}</ul>`).join('')}
       </div>
     </li>`).join('');
 }
 
-/** Opens the current note's theme, lights up its act and names the член being read next to the card. */
+function setThemeOpen(el, open) {
+  el.classList.toggle('is-open', open);
+  $('.th-head', el).setAttribute('aria-expanded', open);
+}
+let autoOpened = null; // the theme last opened by navigation; closing it by hand keeps it closed while reading in it
+
+/** Marks the current note's theme, opens it once on arrival, lights up its act and names the член next to the card. */
 function markRail() {
   const n = current.i != null ? N[current.i] : null;
   const t = themeOf(n);
   if (t && t.country !== railCountry) { railCountry = t.country; renderRail(); }
   document.documentElement.style.setProperty('--accent', t ? t.accent : 'var(--ink)');
   for (const el of $$('#themes .theme')) el.classList.toggle('is-active', !!t && el.dataset.theme === t.dir);
+  if (t && autoOpened !== t.dir) {
+    autoOpened = t.dir;
+    const el = $(`#themes .theme[data-theme="${CSS.escape(t.dir)}"]`);
+    if (el) { setThemeOpen(el, true); $('.th-head', el).scrollIntoView({ block: 'nearest' }); }
+  }
+  for (const el of $$('#themes .th-overview')) el.classList.toggle('is-current', n != null && Number(el.dataset.i) === n.i);
   for (const el of $$('#themes .pt.is-current')) { el.classList.remove('is-current'); $('.pt-here', el).textContent = ''; }
   for (const el of $$('#rail-about a')) el.classList.toggle('is-current', n != null && Number(el.dataset.i) === n.i);
   for (const el of $$('#rail-start .pt')) el.classList.toggle('is-current', n != null && Number(el.dataset.rootI) === n.i);
@@ -918,19 +931,16 @@ function markRail() {
 }
 
 $('#themes').addEventListener('click', (e) => {
-  // A theme without its own overview page just opens in the rail.
+  // A theme's name opens and closes its list of acts; its overview page is the first entry inside.
   const head = e.target.closest('[data-theme-head]');
-  const t = head && themeByDir.get(head.dataset.themeHead);
-  if (t && t.moc == null) {
-    e.preventDefault();
-    head.parentElement.classList.toggle('is-active');
-  }
+  if (head) setThemeOpen(head.parentElement, !head.parentElement.classList.contains('is-open'));
 });
 $('#countries').addEventListener('click', (e) => {
   const c = e.target.closest('[data-country]');
   if (!c || c.dataset.country === railCountry) return;
   e.preventDefault();
   railCountry = c.dataset.country;
+  autoOpened = null;
   renderRail();
   markRail();
 });

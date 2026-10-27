@@ -163,10 +163,16 @@ svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width:
   background: var(--accent);
 }
 .th-head {
+  width: 100%;
+  border: 0;
+  background: none;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
   position: relative;
   z-index: 2;
   display: grid;
-  grid-template-columns: calc(var(--line-x) - 4mm) 8mm minmax(0, 1fr);
+  grid-template-columns: calc(var(--line-x) - 4mm) 8mm minmax(0, 1fr) 6mm;
   align-items: center;
   min-height: 9mm;
   padding: 1mm 0;
@@ -192,7 +198,21 @@ svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width:
 .theme.is-active > .th-head .th-dot { background: var(--ink); }
 
 .th-body { display: none; position: relative; z-index: 2; padding: 1mm 0 4mm calc(var(--line-x) + 4mm); }
-.theme.is-active > .th-body { display: block; }
+.theme.is-open > .th-body { display: block; }
+.th-chev {
+  justify-self: center; width: 2mm; height: 2mm;
+  border-right: 2px solid var(--dim); border-bottom: 2px solid var(--dim);
+  rotate: -45deg; transition: rotate 0.2s var(--ease), border-color 0.2s;
+}
+.theme.is-open > .th-head .th-chev { rotate: 45deg; translate: 0 -0.6mm; }
+.th-head:hover .th-chev { border-color: var(--ink); }
+.theme.is-open:not(.is-active) > .th-head .th-name { color: var(--ink); }
+.th-overview {
+  display: inline-flex; align-items: center; gap: 2mm; margin: 1mm 0 1mm;
+  font-size: 3.4mm; font-weight: 700; color: var(--mute); text-decoration: none;
+}
+.th-overview::before { content: '+'; color: var(--accent); font-size: 4mm; line-height: 1; }
+.th-overview:hover, .th-overview.is-current { color: var(--ink); }
 .grp-label {
   margin: 4mm 0 2mm;
   font-size: 2.9mm;
@@ -751,3 +771,6 @@ a.st-bad, .row.st-bad a { color: var(--dim) !important; }
 .diagram { margin: 6mm 0; padding: 5mm; overflow-x: auto; overscroll-behavior-x: contain; background: var(--bg-2); border: 2px solid var(--line); border-radius: 4px 12px 12px 12px; text-align: center; }
 .diagram:not([data-processed]) { white-space: pre; text-align: left; color: var(--dim); font-size: 3.4mm; }
 .diagram svg { width: auto; height: auto; max-width: none; stroke: none; fill: initial; }
+
+/* keep the lit-up act clear of the bottom-left corner block when the rail scrolls to it */
+.rail .pt, .rail .th-head { scroll-margin: 4mm 0 48mm; }
