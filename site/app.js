@@ -345,8 +345,46 @@ async function renderNote(i) {
     }
   }
   fillEmbeds(main, 0);
+  renderDiagrams(main);
   renderToc(n, data);
   document.title = `${n.label} — ${index.site.title}`;
+}
+
+// ```mermaid blocks become diagrams, drawn in the site's palette and typeface.
+let mermaidReady = null;
+async function renderDiagrams(root) {
+  const blocks = $$('pre > code.language-mermaid', root);
+  if (!blocks.length) return;
+  mermaidReady ||= new Promise((resolve, reject) => {
+    const script = document.createElement('script');
+    script.src = 'vendor/mermaid.min.js';
+    script.onload = () => {
+      window.mermaid.initialize({
+        startOnLoad: false,
+        theme: 'base',
+        fontFamily: 'and_Lubrifont, system-ui, sans-serif',
+        themeVariables: {
+          background: '#232323', primaryColor: '#2c2c2c', primaryTextColor: '#e1e1e1', primaryBorderColor: '#afafaf',
+          secondaryColor: '#1c1c1c', tertiaryColor: '#1c1c1c', lineColor: '#afafaf', textColor: '#e1e1e1',
+          fontSize: '15px', edgeLabelBackground: '#232323',
+        },
+        // Natural size, scrolled sideways when wider than the page: wide flowcharts stay readable.
+        flowchart: { curve: 'basis', padding: 14, useMaxWidth: false },
+      });
+      resolve(window.mermaid);
+    };
+    script.onerror = reject;
+    document.head.append(script);
+  });
+  const mermaid = await mermaidReady;
+  const nodes = blocks.map((code) => {
+    const div = document.createElement('div');
+    div.className = 'diagram mermaid';
+    div.textContent = code.textContent;
+    code.parentElement.replaceWith(div);
+    return div;
+  });
+  try { await mermaid.run({ nodes }); } catch (e) { console.warn('diagram', e); }
 }
 
 async function fillEmbeds(root, depth) {
@@ -374,41 +412,78 @@ $('.tabs').addEventListener('click', (e) => {
   if (b) showTab(b.dataset.tab);
 });
 
+// The table of contents is the act's outline as a collapsible tree, like Obsidian's: ## > ### > #### > членови.
 let tocObserver;
+function outlineOf(n, data) {
+  if (n.act >= 0) return acts[n.act].o;
+  return data.sec.filter((s) => s.a).map((s) => [s.v || (s.k === 'member' ? 7 : 2), s.l, s.a]);
+}
+function tocTree(items) {
+  const root = { level: 0, children: [] };
+  const stack = [root];
+  for (const it of items) {
+    const node = typeof it === 'number' ? { level: 99, unit: it } : { level: it[0], label: it[1], anchor: it[2] };
+    node.children = [];
+    while (stack.length > 1 && stack[stack.length - 1].level >= node.level) stack.pop();
+    stack[stack.length - 1].children.push(node);
+    stack.push(node);
+  }
+  return root.children;
+}
 function renderToc(n, data) {
   tocObserver?.disconnect();
   const box = $('#toc');
   const a = actOf(n);
-  if (a && n.kind !== 'master') {
-    // Inside an act: the act's членови, in the order of the master.
-    box.innerHTML = `<p class="toc-act"><a href="${hrefOf(a.m)}">${esc(a.c)} ${esc(a.t)}</a></p>
-      <ol class="toc">${a.u.map(([u]) => `<li class="m ${statusClass(N[u])}"><a class="wl" href="${hrefOf(u)}" data-k="${u}" data-toc="${u}">${esc(N[u].label)}</a></li>`).join('')}</ol>`;
-    return;
-  }
-  const items = data.sec.filter((s) => s.a);
-  box.innerHTML = items.length
-    ? `<ol class="toc">${items.map((s) => `<li class="${s.k === 'member' ? 'm' : 'h'}"><a href="${hrefOf(`${n.i}#${s.a}`)}" data-anchor="${esc(s.a)}">${esc(s.l)}</a></li>`).join('')}</ol>`
-    : '<p class="hint">Оваа белешка нема членови или наслови.</p>';
-  tocObserver = new IntersectionObserver((entries) => {
-    for (const en of entries) {
-      if (!en.isIntersecting) continue;
-      const link = $(`#toc a[data-anchor="${CSS.escape(en.target.id.slice(2))}"]`);
-      if (!link) continue;
-      $$('#toc a.active').forEach((x) => x.classList.remove('active'));
-      link.classList.add('active');
-      link.scrollIntoView({ block: 'nearest' });
+  const onMaster = n.kind === 'master';
+  const items = outlineOf(n, data);
+  if (!items.length) { box.innerHTML = '<p class="hint">Оваа белешка нема наслови ни членови.</p>'; return; }
+  const linkOf = (node) => {
+    if (node.unit != null) {
+      const u = N[node.unit];
+      const anchor = unitPos.get(node.unit)?.anchor;
+      const href = onMaster && anchor ? hrefOf(`${n.i}#${anchor}`) : hrefOf(node.unit);
+      return `<a class="${statusClass(u)}" href="${href}" data-k="${node.unit}" data-toc="${node.unit}" ${anchor ? `data-anchor="${esc(anchor)}"` : ''}>${esc(u.label)}</a>`;
     }
+    const owner = a ? a.m : n.i;
+    return `<a class="toc-h" href="${hrefOf(`${owner}#${node.anchor}`)}" data-anchor="${esc(node.anchor)}">${esc(node.label)}</a>`;
+  };
+  const html = (nodes) => `<ul>${nodes.map((node) => `
+    <li class="${node.children.length ? 'has-kids collapsed' : ''} ${node.unit != null ? 'is-unit' : `lvl-${Math.min(node.level, 6)}`}">
+      <div class="orow">${node.children.length ? '<button class="tw" data-act="toc-toggle" aria-label="Отвори">▾</button>' : '<span class="tw-space"></span>'}${linkOf(node)}</div>
+      ${node.children.length ? html(node.children) : ''}
+    </li>`).join('')}</ul>`;
+  box.innerHTML = `<div class="panel-head toc-head">
+      ${a ? `<a class="toc-act" href="${hrefOf(a.m)}">${esc(a.c)} · ${esc(a.t)}</a>` : ''}
+      <span class="toc-tools"><button class="btn ghost" data-act="toc-all" data-open="1">отвори сè</button><button class="btn ghost" data-act="toc-all" data-open="0">собери</button></span>
+    </div><div class="otree">${html(tocTree(items))}</div>`;
+  // The top level stays open, so the act's parts are visible at once.
+  $$('.otree > ul > li.has-kids', box).forEach((li) => li.classList.remove('collapsed'));
+  // On a page with its own sections, the entry in view follows the scroll.
+  if (!onMaster && n.kind !== 'note') return;
+  tocObserver = new IntersectionObserver((entries) => {
+    for (const en of entries) if (en.isIntersecting) markToc($(`#toc a[data-anchor="${CSS.escape(en.target.id.slice(2))}"]`), false);
   }, { root: main, rootMargin: '0px 0px -70% 0px' });
-  $$('section.sec[id]', main).forEach((s) => tocObserver.observe(s));
+  $$('section.sec[id]', main).forEach((sec) => tocObserver.observe(sec));
+}
+/** Highlights a table-of-contents entry and opens the branches above it. */
+function markToc(link, center = true) {
+  if (!link) return;
+  $$('#toc a.active').forEach((x) => x.classList.remove('active'));
+  link.classList.add('active');
+  for (let li = link.closest('li'); li; li = li.parentElement.closest('li')) if (li !== link.closest('li')) li.classList.remove('collapsed');
+  link.scrollIntoView({ block: center ? 'center' : 'nearest' });
 }
 function markTocCurrent() {
   if (current.i == null) return;
-  const a = $(`#toc a[data-toc="${current.i}"]`);
-  if (!a) return;
-  $$('#toc a.active').forEach((x) => x.classList.remove('active'));
-  a.classList.add('active');
-  a.scrollIntoView({ block: 'center' });
+  if (current.anchor) markToc($(`#toc a[data-anchor="${CSS.escape(current.anchor)}"]`));
+  else markToc($(`#toc a[data-toc="${current.i}"]`));
 }
+$('#toc').addEventListener('click', (e) => {
+  const t = e.target.closest('[data-act="toc-toggle"]');
+  if (t) { t.closest('li').classList.toggle('collapsed'); return; }
+  const all = e.target.closest('[data-act="toc-all"]');
+  if (all) $$('#toc li.has-kids').forEach((li) => li.classList.toggle('collapsed', all.dataset.open !== '1'));
+});
 
 function renderLinks() {
   const box = $('#links');
@@ -724,7 +799,8 @@ document.addEventListener('click', (e) => {
 // ---------- rail: countries, themes on the line, acts as cards ----------
 
 const naturally = (a, b) => a.localeCompare(b, 'mk', { numeric: true });
-const ACCENTS = ['var(--red)', 'var(--teal)', 'var(--green)', 'var(--yellow)'];
+// One colour per theme along the line: the studio's four accents and the hues between them.
+const THEME_COLORS = ['#e1e1e1', '#e14b4b', '#e8833a', '#f0c84b', '#a9c25a', '#46a064', '#3db39e', '#64aaaa', '#5b9bd5', '#7d84d8', '#a77ed6', '#d278bd', '#e07a8f', '#c09a6b', '#9fb0bf'];
 const sentence = (s) => s.charAt(0) + s.slice(1).toLowerCase();
 
 const countries = [...new Set(index.folders.map((f) => f.split('/')[0]))].sort(naturally);
@@ -739,7 +815,7 @@ for (const f of index.folders) {
   const num = m ? m[1] : '';
   const t = {
     dir, country: p[0], num, name: sentence(m ? m[2] : p[1]),
-    accent: num && Number(num) > 0 ? ACCENTS[(Number(num) - 1) % 4] : 'var(--ink)',
+    accent: num ? THEME_COLORS[Number(num) % THEME_COLORS.length] : 'var(--ink)',
     moc: null, groups: new Map(), acts: 0, units: 0,
   };
   themes.push(t);
@@ -782,32 +858,70 @@ function actCard(ai) {
 }
 
 let railCountry = countries[0];
+
+// The notes outside the themes. site.config.json → rootNotes names them and sorts them into
+// "start" (cards at the top of the rail) and "about" (links at the bottom); any other note there goes to "about".
+const ROOT_ICONS = {
+  list: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6h11M9 12h11M9 18h11"/><circle cx="4.5" cy="6" r="1.4"/><circle cx="4.5" cy="12" r="1.4"/><circle cx="4.5" cy="18" r="1.4"/></svg>',
+  flow: '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="2.5" y="3.5" width="7" height="5" rx="1.2"/><rect x="14.5" y="15.5" width="7" height="5" rx="1.2"/><path d="M6 8.5v5a2.5 2.5 0 0 0 2.5 2.5h6M12 13.5l2.5 2.5-2.5 2.5"/></svg>',
+  note: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h8l4 4v14H6z"/><path d="M14 3v4h4M9 12h6M9 16h6"/></svg>',
+};
+const START_ACCENTS = ['var(--red)', 'var(--yellow)', 'var(--teal)', 'var(--green)'];
+function rootNotesOf(country) {
+  const cfg = (index.site.rootNotes || []).filter((r) => N[r.i]?.dir === country);
+  const named = new Set(cfg.map((r) => r.i));
+  const start = cfg.filter((r) => r.group === 'start').map((r, k) => ({ ...r, accent: START_ACCENTS[k % START_ACCENTS.length] }));
+  const about = [
+    ...cfg.filter((r) => r.group !== 'start'),
+    ...N.filter((n) => n.dir === country && !named.has(n.i)).sort((a, b) => naturally(a.base, b.base)).map((n) => ({ i: n.i, label: n.label })),
+  ];
+  return { start, about };
+}
 function renderRail() {
   $('#countries').innerHTML = countries.map((c) => `<a class="country${c === railCountry ? ' is-active' : ''}" href="#/" data-country="${esc(c)}">${esc(c)}</a>`).join('');
-  $('#rail-root').innerHTML = N.filter((n) => n.dir === railCountry)
-    .sort((a, b) => naturally(a.base, b.base))
-    .map((n) => `<li><a href="${hrefOf(n.i)}" data-i="${n.i}">${esc(n.label)}</a></li>`).join('');
+  const { start, about } = rootNotesOf(railCountry);
+  $('#rail-start').innerHTML = start.length ? `<p class="rail-label">Почни тука</p>
+    <ul class="act-list start-list">${start.map((r) => `<li class="pt" data-root-i="${r.i}" style="--accent:${r.accent}"><a href="${hrefOf(r.i)}">
+      <span class="pt-frame pt-icon">${ROOT_ICONS[r.icon] || ROOT_ICONS.note}</span>
+      <span class="pt-card"><span class="pt-title">${esc(r.label)}</span>${r.text ? `<span class="pt-text">${esc(r.text)}</span>` : ''}</span>
+    </a></li>`).join('')}</ul>` : '';
+  $('#rail-about').innerHTML = about.length ? `<p class="rail-label">За базата</p>
+    <ul class="about-list">${about.map((r) => `<li><a href="${hrefOf(r.i)}" data-i="${r.i}">${esc(r.label)}</a></li>`).join('')}</ul>` : '';
   $('#themes').innerHTML = themes.filter((t) => t.country === railCountry).map((t) => `
     <li class="theme" data-theme="${esc(t.dir)}" style="--accent:${t.accent}">
-      <a class="th-head" href="${t.moc != null ? hrefOf(t.moc) : '#/'}" data-theme-head="${esc(t.dir)}">
-        <span class="th-num">${esc(t.num)}</span><span class="th-dot"></span><span class="th-name">${esc(t.name)}</span>
-      </a>
-      <div class="th-body">${[...t.groups.entries()].map(([g, list]) => `
+      <button class="th-head" type="button" data-theme-head="${esc(t.dir)}" aria-expanded="false">
+        <span class="th-num">${esc(t.num)}</span><span class="th-dot"></span><span class="th-name">${esc(t.name)}</span><span class="th-chev" aria-hidden="true"></span>
+      </button>
+      <div class="th-body">
+        ${t.moc != null ? `<a class="th-overview" href="${hrefOf(t.moc)}" data-i="${t.moc}">Преглед на темата</a>` : ''}${[...t.groups.entries()].map(([g, list]) => `
         ${g ? `<p class="grp-label">${esc(g)}</p>` : ''}
         <ul class="act-list">${list.map(actCard).join('')}</ul>`).join('')}
       </div>
     </li>`).join('');
 }
 
-/** Opens the current note's theme, lights up its act and names the член being read next to the card. */
+function setThemeOpen(el, open) {
+  el.classList.toggle('is-open', open);
+  $('.th-head', el).setAttribute('aria-expanded', open);
+}
+let autoOpened = null; // the theme last opened by navigation; closing it by hand keeps it closed while reading in it
+
+/** Marks the current note's theme, opens it once on arrival, lights up its act and names the член next to the card. */
 function markRail() {
   const n = current.i != null ? N[current.i] : null;
   const t = themeOf(n);
   if (t && t.country !== railCountry) { railCountry = t.country; renderRail(); }
   document.documentElement.style.setProperty('--accent', t ? t.accent : 'var(--ink)');
   for (const el of $$('#themes .theme')) el.classList.toggle('is-active', !!t && el.dataset.theme === t.dir);
+  if (t && autoOpened !== t.dir) {
+    autoOpened = t.dir;
+    const el = $(`#themes .theme[data-theme="${CSS.escape(t.dir)}"]`);
+    if (el) { setThemeOpen(el, true); $('.th-head', el).scrollIntoView({ block: 'nearest' }); }
+  }
+  for (const el of $$('#themes .th-overview')) el.classList.toggle('is-current', n != null && Number(el.dataset.i) === n.i);
   for (const el of $$('#themes .pt.is-current')) { el.classList.remove('is-current'); $('.pt-here', el).textContent = ''; }
-  for (const el of $$('#rail-root a')) el.classList.toggle('is-current', n != null && Number(el.dataset.i) === n.i);
+  for (const el of $$('#rail-about a')) el.classList.toggle('is-current', n != null && Number(el.dataset.i) === n.i);
+  for (const el of $$('#rail-start .pt')) el.classList.toggle('is-current', n != null && Number(el.dataset.rootI) === n.i);
   if (!n || n.act < 0) return;
   const card = $(`#themes .pt[data-act-i="${n.act}"]`);
   if (!card) return;
@@ -817,19 +931,16 @@ function markRail() {
 }
 
 $('#themes').addEventListener('click', (e) => {
-  // A theme without its own overview page just opens in the rail.
+  // A theme's name opens and closes its list of acts; its overview page is the first entry inside.
   const head = e.target.closest('[data-theme-head]');
-  const t = head && themeByDir.get(head.dataset.themeHead);
-  if (t && t.moc == null) {
-    e.preventDefault();
-    head.parentElement.classList.toggle('is-active');
-  }
+  if (head) setThemeOpen(head.parentElement, !head.parentElement.classList.contains('is-open'));
 });
 $('#countries').addEventListener('click', (e) => {
   const c = e.target.closest('[data-country]');
   if (!c || c.dataset.country === railCountry) return;
   e.preventDefault();
   railCountry = c.dataset.country;
+  autoOpened = null;
   renderRail();
   markRail();
 });
@@ -837,7 +948,7 @@ $('#countries').addEventListener('click', (e) => {
 // ---------- home ----------
 
 function renderHome() {
-  const roots = N.filter((x) => x.dir === railCountry).sort((a, b) => (a.kind === 'moc' ? -1 : b.kind === 'moc' ? 1 : naturally(a.base, b.base)));
+  const { start, about } = rootNotesOf(railCountry);
   const list = themes.filter((t) => t.country === railCountry);
   const totalActs = list.reduce((s, t) => s + t.acts, 0);
   const totalUnits = list.reduce((s, t) => s + t.units, 0);
@@ -845,7 +956,14 @@ function renderHome() {
     <div class="eyebrow"><span>Прописи</span><span>Членови</span><span>Врски</span><span>Белешки</span></div>
     <h1>and_codes</h1>
     <p class="lead">Консолидираните прописи на студиото: ${plural(totalActs, 'акт', 'акти')} и ${plural(totalUnits, 'член', 'членови')}, секој член со своите врски. Лебди врз упатување за преглед, закачи членови во сесијата и следи ги врските во дрвото.</p>
-    <div class="home-links">${roots.map((r) => `<a class="btn" href="${hrefOf(r.i)}"><span class="btn-dot"></span>${esc(r.label.replace(/^00 — /, ''))}</a>`).join('')}</div>
+    <div class="home-start">${start.map((r) => `
+      <a class="tile tile-start" href="${hrefOf(r.i)}" style="--accent:${r.accent}">
+        <span class="tile-frame">${ROOT_ICONS[r.icon] || ROOT_ICONS.note}</span>
+        <span class="tile-card"><span class="tile-dot"></span><span class="tile-title">${esc(r.label)}</span>${r.text ? `<span class="tile-text">${esc(r.text)}</span>` : ''}</span>
+      </a>`).join('')}
+    </div>
+    ${about.length ? `<p class="home-about">За базата: ${about.map((r) => `<a href="${hrefOf(r.i)}">${esc(r.label)}</a>`).join(' · ')}</p>` : ''}
+    <p class="rail-label home-themes">Теми</p>
     <div class="tiles">${list.map((t) => `
       <a class="tile" href="${t.moc != null ? hrefOf(t.moc) : '#/'}" style="--accent:${t.accent}">
         <span class="tile-frame">${esc(t.num)}</span>
@@ -976,6 +1094,9 @@ $('#toggle-right').addEventListener('click', () => document.body.classList.toggl
 // ---------- start ----------
 
 renderRail();
+const legend = $('#legend');
+legend.open = local.get('legend') === '1';
+legend.addEventListener('toggle', () => local.set('legend', legend.open ? '1' : '0'));
 showTab(local.get('tab') || 'toc');
 syncPins();
 renderTree();
