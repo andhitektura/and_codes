@@ -1,6 +1,6 @@
 # and_codes
 
-The studio's regulations vault (`CODES/`) and a static website built from it.
+The studio's regulations vault (`CODES/`) and **and_codes**, the static website built from it. The site follows the design of [andhitektura.com](https://github.com/andhitektura/andhitektura.com): its palette, dot grid, the line and frame-and-card lists, and the studio typeface [and_Lubrifont](https://github.com/andhitektura/and_Lubrifont) (SIL OFL 1.1, `site/fonts/and_Lubrifont/OFL.txt`).
 
 The site reads the vault the way it is organised (see `CODES/MKD/_instructions/`). Each член note (`<КОД>-Членови/<КОД>-Член N.md`) is the unit the site links to, pins and traces. The master (`<КОД> - консолидиран.md`) is the act's page.
 
@@ -8,6 +8,7 @@ The site reads the vault the way it is organised (see `CODES/MKD/_instructions/`
 - **Pins (session memory).** The pin button on a член, either on its own page or on its heading in the master, adds it to *Закачени*. Pins last as long as the browser tab is open, and they survive a reload or a rebuild of the site. **Копирај сè** copies the text of every pinned член, with its citation ("Закон за градење, Член 59 (ГР-01)"). Callouts, footnote markers and previous redactions are left out of the copy.
 - **Research tree (*Дрво*).** For a член, the tree shows what it links to (→) and what links to it (←); each node expands on click, and loops are marked with ↻. Starting from a whole act, the links are grouped by act. **Копирај** copies the expanded branch as an indented outline with citations.
 - **Search.** Full-text search (Ctrl+K) over членови, преодни одредби and notes, with a filter by theme. Previous redactions from `-Архива/` are searched only when that filter is ticked. Masters whose text lives in their член notes are found by name.
+- **The line.** The rail on the left lists the themes on the line (00–14, each in its accent). The open theme shows its acts as numbered cards, laws and bylaws apart, and the act being read is lit up with the член you're on next to its card. The home page shows the themes as tiles.
 - **Navigation.** A член page has previous/next член links and a link to the same place in the consolidated text. The *Содржина* tab lists all членови of the act, with deleted ones struck through. *Поврзано* shows backlinks. Frontmatter links (`котва`, `заменет-со`) are clickable.
 
 ## Running it

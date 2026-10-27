@@ -231,7 +231,7 @@ let current = { i: null, anchor: '' };
 
 function parseHash() {
   const p = location.hash.replace(/^#\/?/, '');
-  if (!p) return { i: index.site.home, anchor: '' };
+  if (!p) return { i: null, anchor: '', home: true };
   const [s, a] = p.split('/');
   let u = s;
   let anchor = a || '';
@@ -242,8 +242,11 @@ function parseHash() {
 async function route() {
   closePopovers(0);
   document.body.classList.remove('show-left', 'show-right');
-  const { i, anchor } = parseHash();
-  if (i == null) {
+  const { i, anchor, home } = parseHash();
+  if (home) {
+    current = { i: null, anchor: '', home: true };
+    renderHome();
+  } else if (i == null) {
     current = { i: null, anchor: '' };
     main.innerHTML = '<article class="note"><h1>Не е пронајдено</h1><p>Оваа белешка не постои или не е објавена.</p></article>';
     $('#toc').innerHTML = '';
@@ -253,7 +256,7 @@ async function route() {
     await renderNote(i);
   }
   current.anchor = anchor;
-  highlightExplorer();
+  markRail();
   renderLinks();
   markTreeCurrent();
   markTocCurrent();
@@ -285,12 +288,17 @@ function refCounts(k) {
   return `<button class="refs" data-act="tree" data-k="${esc(k)}" title="Упатува на ${o} · Упатено од ${i}">→${o} ←${i}</button>`;
 }
 
-function crumbs(n) {
+/** Theme · group · act above the title, each with its dot, as on andhitektura.com. */
+function eyebrow(n) {
   const parts = n.dir.split('/');
+  const t = themeOf(n);
+  const items = [];
+  if (t) items.push(t.moc != null ? `<a href="${hrefOf(t.moc)}">${esc(t.name)}</a>` : `<span>${esc(t.name)}</span>`);
+  else items.push(`<span>${esc(parts[0])}</span>`);
+  if (parts[2] && n.kind !== 'moc') items.push(`<span>${esc(parts[2].toLowerCase())}</span>`);
   const a = actOf(n);
-  const html = parts.map(esc).join(' / ');
-  if (!a || n.kind === 'master') return html;
-  return `${html.split(' / ').slice(0, -1).join(' / ')} / <a href="${hrefOf(a.m)}">${esc(a.c)} ${esc(a.t)}</a>`;
+  if (a && n.kind !== 'master') items.push(`<a href="${hrefOf(a.m)}">${esc(a.c)}</a>`);
+  return items.join('');
 }
 
 function unitNav(n) {
@@ -313,7 +321,7 @@ async function renderNote(i) {
   if (current.i !== i) return;
   const key = String(i);
   let html = `<article class="note kind-${n.kind}">
-    <div class="crumbs">${crumbs(n)}</div>
+    <div class="eyebrow">${eyebrow(n)}</div>
     <header class="note-head">
       <h1>${esc(n.kind === 'unit' && actOf(n) ? `${actOf(n).c} · ${n.label}` : n.label)}</h1>
       <div class="note-meta">${chips(data.c)}${fmLinks(data.fl)}${refCounts(key)}${actionButtons(key)}</div>
@@ -713,58 +721,141 @@ document.addEventListener('click', (e) => {
   t.classList.add('flash');
 });
 
-// ---------- explorer (rendered lazily, folder by folder) ----------
+// ---------- rail: countries, themes on the line, acts as cards ----------
 
-const dirTree = { name: '', path: '', dirs: new Map(), files: [] };
-for (const n of N) {
-  let d = dirTree;
-  for (const p of n.dir.split('/')) {
-    if (!d.dirs.has(p)) d.dirs.set(p, { name: p, path: d.path ? `${d.path}/${p}` : p, dirs: new Map(), files: [] });
-    d = d.dirs.get(p);
-  }
-  d.files.push(n);
-}
-const dirByPath = new Map();
-(function index(d) { dirByPath.set(d.path, d); for (const c of d.dirs.values()) index(c); })(dirTree);
-const actDirs = new Set(acts.map((a) => N[a.m].dir));
 const naturally = (a, b) => a.localeCompare(b, 'mk', { numeric: true });
+const ACCENTS = ['var(--red)', 'var(--teal)', 'var(--green)', 'var(--yellow)'];
+const sentence = (s) => s.charAt(0) + s.slice(1).toLowerCase();
 
-function dirChildrenHtml(d) {
-  const files = [...d.files].sort((a, b) => {
-    if (a.kind === 'master' || b.kind === 'master') return a.kind === 'master' ? -1 : 1;
-    const pa = unitPos.get(a.i);
-    const pb = unitPos.get(b.i);
-    if (pa && pb) return pa.j - pb.j;
-    return naturally(a.base, b.base);
-  });
-  const dirs = [...d.dirs.values()].sort((a, b) => naturally(a.name, b.name));
-  const dirsHtml = dirs.map((c) => `<details data-path="${esc(c.path)}"><summary>${esc(c.name)}</summary></details>`).join('');
-  const filesHtml = `<ul>${files.map((n) => `<li><a href="${hrefOf(n.i)}" data-i="${n.i}" class="${statusClass(n)}${n.kind === 'master' ? ' master' : ''}">${esc(n.label)}</a></li>`).join('')}</ul>`;
-  return actDirs.has(d.path) ? filesHtml + dirsHtml : dirsHtml + filesHtml;
+const countries = [...new Set(index.folders.map((f) => f.split('/')[0]))].sort(naturally);
+const themes = [];
+const themeByDir = new Map();
+for (const f of index.folders) {
+  const p = f.split('/');
+  if (p.length < 2) continue;
+  const dir = `${p[0]}/${p[1]}`;
+  if (themeByDir.has(dir)) continue;
+  const m = p[1].match(/^(\d+)\s+(.+)$/);
+  const num = m ? m[1] : '';
+  const t = {
+    dir, country: p[0], num, name: sentence(m ? m[2] : p[1]),
+    accent: num && Number(num) > 0 ? ACCENTS[(Number(num) - 1) % 4] : 'var(--ink)',
+    moc: null, groups: new Map(), acts: 0, units: 0,
+  };
+  themes.push(t);
+  themeByDir.set(dir, t);
 }
-function renderExplorer() {
-  $('#explorer').innerHTML = dirChildrenHtml(dirTree);
+themes.sort((a, b) => naturally(a.dir, b.dir));
+for (const n of N) if (n.kind === 'moc' && themeByDir.get(n.dir)) themeByDir.get(n.dir).moc = n.i;
+acts.forEach((a, ai) => {
+  const p = N[a.m].dir.split('/');
+  const t = themeByDir.get(`${p[0]}/${p[1]}`);
+  if (!t) return;
+  const g = p.length > 3 ? p[2] : '';
+  if (!t.groups.has(g)) t.groups.set(g, []);
+  t.groups.get(g).push(ai);
+  t.acts++;
+  t.units += a.u.length;
+});
+for (const t of themes) {
+  for (const list of t.groups.values()) list.sort((x, y) => naturally(acts[x].c, acts[y].c));
+  t.groups = new Map([...t.groups.entries()].sort((x, y) => naturally(x[0], y[0])));
 }
-function openDir(details) {
-  if (!details.dataset.filled) {
-    details.dataset.filled = '1';
-    details.insertAdjacentHTML('beforeend', dirChildrenHtml(dirByPath.get(details.dataset.path)));
+function themeOf(n) {
+  if (!n) return null;
+  const p = n.dir.split('/');
+  return themeByDir.get(`${p[0]}/${p[1]}`) || null;
+}
+const ACT_STATUS = { важечки: 'st-ok', 'за проверка': 'st-warn', 'престанал да важи': 'st-bad' };
+const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
+
+function actCard(ai) {
+  const a = acts[ai];
+  const [pre, ...rest] = a.c.split('-');
+  const num = rest.join('-');
+  const text = a.u.length ? plural(a.u.length, 'член', 'членови') : 'консолидиран текст';
+  return `<li class="pt" data-act-i="${ai}"><a href="${hrefOf(a.m)}" title="${esc(a.c)} ${esc(a.t)}">
+    <span class="pt-frame">${num ? `<small>${esc(pre)}</small>${esc(num)}` : esc(a.c)}</span>
+    <span class="pt-card"><span class="pt-dot ${ACT_STATUS[a.s] || ''}" title="${esc(a.s)}"></span>
+      <span class="pt-title">${esc(a.t)}</span><span class="pt-text">${esc(text)}</span><span class="pt-here"></span></span>
+  </a></li>`;
+}
+
+let railCountry = countries[0];
+function renderRail() {
+  $('#countries').innerHTML = countries.map((c) => `<a class="country${c === railCountry ? ' is-active' : ''}" href="#/" data-country="${esc(c)}">${esc(c)}</a>`).join('');
+  $('#rail-root').innerHTML = N.filter((n) => n.dir === railCountry)
+    .sort((a, b) => naturally(a.base, b.base))
+    .map((n) => `<li><a href="${hrefOf(n.i)}" data-i="${n.i}">${esc(n.label)}</a></li>`).join('');
+  $('#themes').innerHTML = themes.filter((t) => t.country === railCountry).map((t) => `
+    <li class="theme" data-theme="${esc(t.dir)}" style="--accent:${t.accent}">
+      <a class="th-head" href="${t.moc != null ? hrefOf(t.moc) : '#/'}" data-theme-head="${esc(t.dir)}">
+        <span class="th-num">${esc(t.num)}</span><span class="th-dot"></span><span class="th-name">${esc(t.name)}</span>
+      </a>
+      <div class="th-body">${[...t.groups.entries()].map(([g, list]) => `
+        ${g ? `<p class="grp-label">${esc(g)}</p>` : ''}
+        <ul class="act-list">${list.map(actCard).join('')}</ul>`).join('')}
+      </div>
+    </li>`).join('');
+}
+
+/** Opens the current note's theme, lights up its act and names the член being read next to the card. */
+function markRail() {
+  const n = current.i != null ? N[current.i] : null;
+  const t = themeOf(n);
+  if (t && t.country !== railCountry) { railCountry = t.country; renderRail(); }
+  document.documentElement.style.setProperty('--accent', t ? t.accent : 'var(--ink)');
+  for (const el of $$('#themes .theme')) el.classList.toggle('is-active', !!t && el.dataset.theme === t.dir);
+  for (const el of $$('#themes .pt.is-current')) { el.classList.remove('is-current'); $('.pt-here', el).textContent = ''; }
+  for (const el of $$('#rail-root a')) el.classList.toggle('is-current', n != null && Number(el.dataset.i) === n.i);
+  if (!n || n.act < 0) return;
+  const card = $(`#themes .pt[data-act-i="${n.act}"]`);
+  if (!card) return;
+  card.classList.add('is-current');
+  if (n.kind !== 'master') $('.pt-here', card).textContent = n.label;
+  card.scrollIntoView({ block: 'nearest' });
+}
+
+$('#themes').addEventListener('click', (e) => {
+  // A theme without its own overview page just opens in the rail.
+  const head = e.target.closest('[data-theme-head]');
+  const t = head && themeByDir.get(head.dataset.themeHead);
+  if (t && t.moc == null) {
+    e.preventDefault();
+    head.parentElement.classList.toggle('is-active');
   }
-  details.open = true;
-}
-$('#explorer').addEventListener('toggle', (e) => {
-  if (e.target.tagName === 'DETAILS' && e.target.open && !e.target.dataset.filled) openDir(e.target);
-}, true);
-function highlightExplorer() {
-  $$('#explorer a.active').forEach((a) => a.classList.remove('active'));
-  if (current.i == null) return;
-  const parts = N[current.i].dir.split('/');
-  for (let j = 1; j <= parts.length; j++) {
-    const el = $(`#explorer details[data-path="${CSS.escape(parts.slice(0, j).join('/'))}"]`);
-    if (el) openDir(el);
-  }
-  const a = $(`#explorer a[data-i="${current.i}"]`);
-  if (a) { a.classList.add('active'); a.scrollIntoView({ block: 'nearest' }); }
+});
+$('#countries').addEventListener('click', (e) => {
+  const c = e.target.closest('[data-country]');
+  if (!c || c.dataset.country === railCountry) return;
+  e.preventDefault();
+  railCountry = c.dataset.country;
+  renderRail();
+  markRail();
+});
+
+// ---------- home ----------
+
+function renderHome() {
+  const roots = N.filter((x) => x.dir === railCountry).sort((a, b) => (a.kind === 'moc' ? -1 : b.kind === 'moc' ? 1 : naturally(a.base, b.base)));
+  const list = themes.filter((t) => t.country === railCountry);
+  const totalActs = list.reduce((s, t) => s + t.acts, 0);
+  const totalUnits = list.reduce((s, t) => s + t.units, 0);
+  main.innerHTML = `<div class="home">
+    <div class="eyebrow"><span>Прописи</span><span>Членови</span><span>Врски</span><span>Белешки</span></div>
+    <h1>and_codes</h1>
+    <p class="lead">Консолидираните прописи на студиото: ${plural(totalActs, 'акт', 'акти')} и ${plural(totalUnits, 'член', 'членови')}, секој член со своите врски. Лебди врз упатување за преглед, закачи членови во сесијата и следи ги врските во дрвото.</p>
+    <div class="home-links">${roots.map((r) => `<a class="btn" href="${hrefOf(r.i)}"><span class="btn-dot"></span>${esc(r.label.replace(/^00 — /, ''))}</a>`).join('')}</div>
+    <div class="tiles">${list.map((t) => `
+      <a class="tile" href="${t.moc != null ? hrefOf(t.moc) : '#/'}" style="--accent:${t.accent}">
+        <span class="tile-frame">${esc(t.num)}</span>
+        <span class="tile-card"><span class="tile-dot"></span><span class="tile-title">${esc(t.name)}</span>
+          <span class="tile-text">${plural(t.acts, 'акт', 'акти')} · ${plural(t.units, 'член', 'членови')}</span></span>
+      </a>`).join('')}
+    </div>
+  </div>`;
+  $('#toc').innerHTML = '<p class="hint">Отвори акт или член за да ја видиш неговата содржина.</p>';
+  document.title = index.site.title;
 }
 
 // ---------- search (Pagefind) ----------
@@ -879,19 +970,12 @@ document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape') closePopovers(0);
 });
 
-$('#toggle-theme').addEventListener('click', () => {
-  const dark = document.documentElement.dataset.theme
-    ? document.documentElement.dataset.theme === 'dark'
-    : matchMedia('(prefers-color-scheme: dark)').matches;
-  document.documentElement.dataset.theme = dark ? 'light' : 'dark';
-  local.set('theme', dark ? 'light' : 'dark');
-});
 $('#toggle-left').addEventListener('click', () => document.body.classList.toggle('show-left'));
 $('#toggle-right').addEventListener('click', () => document.body.classList.toggle('show-right'));
 
 // ---------- start ----------
 
-renderExplorer();
+renderRail();
 showTab(local.get('tab') || 'toc');
 syncPins();
 renderTree();
