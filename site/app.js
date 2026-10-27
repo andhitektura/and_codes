@@ -243,7 +243,6 @@ async function route() {
   closePopovers(0);
   document.body.classList.remove('show-left', 'show-right');
   const { i, anchor, home } = parseHash();
-  document.body.dataset.view = home ? 'home' : 'note';
   if (home) {
     current = { i: null, anchor: '', home: true };
     renderHome();
@@ -346,46 +345,8 @@ async function renderNote(i) {
     }
   }
   fillEmbeds(main, 0);
-  renderDiagrams(main);
   renderToc(n, data);
   document.title = `${n.label} — ${index.site.title}`;
-}
-
-// ```mermaid blocks become diagrams, drawn in the site's palette and typeface.
-let mermaidReady = null;
-async function renderDiagrams(root) {
-  const blocks = $$('pre > code.language-mermaid', root);
-  if (!blocks.length) return;
-  mermaidReady ||= new Promise((resolve, reject) => {
-    const script = document.createElement('script');
-    script.src = 'vendor/mermaid.min.js';
-    script.onload = () => {
-      window.mermaid.initialize({
-        startOnLoad: false,
-        theme: 'base',
-        fontFamily: 'and_Lubrifont, system-ui, sans-serif',
-        themeVariables: {
-          background: '#232323', primaryColor: '#2c2c2c', primaryTextColor: '#e1e1e1', primaryBorderColor: '#afafaf',
-          secondaryColor: '#1c1c1c', tertiaryColor: '#1c1c1c', lineColor: '#afafaf', textColor: '#e1e1e1',
-          fontSize: '15px', edgeLabelBackground: '#232323',
-        },
-        // Natural size, scrolled sideways when wider than the page: wide flowcharts stay readable.
-        flowchart: { curve: 'basis', padding: 14, useMaxWidth: false },
-      });
-      resolve(window.mermaid);
-    };
-    script.onerror = reject;
-    document.head.append(script);
-  });
-  const mermaid = await mermaidReady;
-  const nodes = blocks.map((code) => {
-    const div = document.createElement('div');
-    div.className = 'diagram mermaid';
-    div.textContent = code.textContent;
-    code.parentElement.replaceWith(div);
-    return div;
-  });
-  try { await mermaid.run({ nodes }); } catch (e) { console.warn('diagram', e); }
 }
 
 async function fillEmbeds(root, depth) {
