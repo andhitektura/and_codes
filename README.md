@@ -8,7 +8,7 @@ The site reads the vault the way it is organised (see `CODES/MKD/_instructions/`
 - **Pins (session memory).** The pin button on a член, either on its own page or on its heading in the master, adds it to *Закачени*. Pins last as long as the browser tab is open, and they survive a reload or a rebuild of the site. **Копирај сè** copies the text of every pinned член, with its citation ("Закон за градење, Член 59 (ГР-01)"). Callouts, footnote markers and previous redactions are left out of the copy.
 - **Research tree (*Дрво*).** For a член, the tree shows what it links to (→) and what links to it (←); each node expands on click, and loops are marked with ↻. Starting from a whole act, the links are grouped by act. **Копирај** copies the expanded branch as an indented outline with citations.
 - **Search.** Full-text search (Ctrl+K) over членови, преодни одредби and notes, with a filter by theme. Previous redactions from `-Архива/` are searched only when that filter is ticked. Masters whose text lives in their член notes are found by name.
-- **Root notes.** The notes outside the themes are listed in `rootNotes` in `site.config.json`: `start` notes (Регистар на прописи) are cards at the top of the rail and on the home page; `about` notes (Методологија и ограничувања) sit in the bottom-left corner with the legend. A root note not listed there goes to `about`. Mermaid diagrams in notes are drawn in the site's palette.
+- **Root notes.** The notes outside the themes are listed in `rootNotes` in `site.config.json`: `start` notes (Регистар на прописи) are cards at the top of the rail and on the home page; `about` notes (Методологија и ограничувања) sit in the bottom-left corner with the legend. A root note not listed there goes to `about`.
 - **The line.** The rail on the left lists the themes on the line (00–14, each in its accent). A theme's name opens and closes its list of acts (numbered cards, laws and bylaws apart, its overview page first); themes start collapsed, several can be open, and opening a член opens its theme once. The act being read is lit up with the член you're on next to its card. The home page shows the themes as tiles.
 - **Navigation.** A член page has previous/next член links and a link to the same place in the consolidated text. *Содржина* is the act's outline as a collapsible tree (`##` › `###` › `####` › членови), open down to the член being read; deleted членови are struck through. *Врски* shows backlinks. Frontmatter links (`котва`, `заменет-со`) are clickable. The legend (bottom left) explains the colours and symbols.
 - **AI instructions.** `AI-INSTRUCTIONS.md` at the repository root tells an AI assistant how to read, find and cite the vault (the authority rule, structure, naming, statuses, verification levels, how to answer) and carries the live register of acts with their paths. `npm run build` regenerates it from `site/ai-instructions.md`, so commit it after changing the vault; the site also serves it as `ai-instructions.md`.
@@ -39,7 +39,7 @@ How notes are recognised:
 
 Masters, archive notes and MOCs don't add links to the graph. The master repeats its членови, the archive is history (т. 5.4), and the MOCs are indexes.
 
-New countries (`CODES/US`, `CODES/UK`, …) are picked up automatically: each country becomes a top-level folder in the explorer and a set of themes in the search filter.
+New countries (`CODES/US`, `CODES/UK`, …) are picked up automatically: each country gets its own button above the rail, its themes on the line and in the search filter.
 
 ## Deploying
 
@@ -56,5 +56,5 @@ CODES/            the vault
 build/build.mjs   vault → dist/data (index, per-act bundles) + dist/pagefind (search)
 build/serve.mjs   local preview server
 site/             the client: index.html, app.js, style.css
-site.config.json  title, home note, what to publish, which frontmatter fields to show
+site.config.json  title, what to publish, root notes, which frontmatter fields to show
 ```

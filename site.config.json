@@ -1,7 +1,6 @@
 {
   "title": "and_codes",
   "contentDir": "CODES",
-  "home": "MKD/00 MOC — Регистар на прописи",
   "language": "mk",
   "ignore": [
     "/_instructions/$",

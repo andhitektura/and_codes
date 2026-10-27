@@ -424,12 +424,11 @@ fs.mkdirSync(path.join(DIST, 'data', 'b'), { recursive: true });
 
 const folders = [...new Set(notes.map((n) => n.dir))].sort((a, b) => a.localeCompare(b, 'mk', { numeric: true }));
 const folderIdx = new Map(folders.map((f, i) => [f, i]));
-const homeNote = resolveNote(config.home, null);
 
 const json = (o) => JSON.stringify(o, (k, v) => (v instanceof Date ? v.toISOString().slice(0, 10) : v));
 const index = {
   site: {
-    title: config.title, home: homeNote ? homeNote.i : null, metaSections: [...META_SECTIONS],
+    title: config.title, metaSections: [...META_SECTIONS],
     // The notes outside the themes, as the rail shows them: name, short label, group ("start" or "about").
     rootNotes: (config.rootNotes || []).map((r) => ({ ...r, i: resolveNote(r.note, null)?.i ?? null })).filter((r) => r.i != null),
   },
@@ -457,9 +456,6 @@ for (const rel of assetFiles) {
 }
 
 fs.cpSync(SITE, DIST, { recursive: true });
-fs.mkdirSync(path.join(DIST, 'vendor'), { recursive: true });
-// Diagrams (```mermaid in notes such as Преглед на постапка), loaded only on pages that have one.
-fs.copyFileSync(path.join(ROOT, 'node_modules', 'mermaid', 'dist', 'mermaid.min.js'), path.join(DIST, 'vendor', 'mermaid.min.js'));
 
 // The AI instructions: the template with the live register of acts.
 const cell = (v) => String(v ?? '').replace(/\|/g, '\\|');
