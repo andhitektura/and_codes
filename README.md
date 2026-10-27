@@ -40,12 +40,11 @@ New countries (`CODES/US`, `CODES/UK`, …) are picked up automatically: each co
 
 ## Deploying
 
-The build output in `dist/` is plain static files, about 11,000 files and 285 MB, most of it the scanned annex images. To use Cloudflare Pages, connect the repo with:
+The build output in `dist/` is plain static files, about 11,000 files and 285 MB, most of it the scanned annex images. Every link is relative and routing uses `#/…`, so the site works from any sub-path.
 
-- Build command: `npm run build`
-- Output directory: `dist`
+**GitHub Pages** (`.github/workflows/pages.yml`): every push to `main` builds the site and deploys it. To turn it on, go to Settings → Pages → Source and choose **GitHub Actions**. Pages needs the repo to be public, or a paid GitHub plan for a private repo. For a custom domain such as `codes.andhitektura.com`, set it in the same settings page and add a CNAME record at the DNS provider pointing to `andhitektura.github.io`.
 
-Cloudflare Pages allows 20,000 files per deployment on the free plan. Cloudflare Access can put a login in front of the site.
+**Cloudflare Pages** is the alternative for a private repo. Connect the repo with build command `npm run build` and output directory `dist`.
 
 ## Layout
 
