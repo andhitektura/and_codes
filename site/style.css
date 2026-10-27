@@ -801,18 +801,17 @@ a.st-bad, .row.st-bad a { color: var(--dim) !important; }
 .rail .pt, .rail .th-head { scroll-margin: 4mm 0 48mm; }
 
 /* ───────────── the studio's logo in the corner (from andhitektura.com) ─────────────
-   One logo that morphs between the landing-page size (blocks, wordmark, four dots) and the compact tag
-   (blocks, the red dot in the D, the pin). Geometry in units of the block height --lh. */
+   The compact tag of the studio site's corner logo: the blocks, the red dot in the D and the pin.
+   Geometry in units of the block height --lh; --c: 1 is the compact state of the original morph. */
 
 @property --c { syntax: '<number>'; inherits: true; initial-value: 0; }
 @property --lh { syntax: '<length>'; inherits: true; initial-value: 11mm; }
 .corner {
+  /* always the compact tag: the blocks, the red dot in the D and the pin */
   position: fixed; z-index: 25; right: 8mm; bottom: 8mm;
-  --lh: clamp(12mm, 4vw, 18mm);
-  --c: 0;
-  transition: --c 1s cubic-bezier(0.45, 0, 0.25, 1), --lh 1s cubic-bezier(0.45, 0, 0.25, 1);
+  --lh: 11mm;
+  --c: 1;
 }
-body:not([data-view='home']) .corner { --lh: 11mm; --c: 1; }
 .logo-btn { position: relative; display: block; text-decoration: none; }
 .logo {
   --g: min(1, calc(var(--c) * 2.5));
@@ -854,6 +853,5 @@ body:not([data-view='home']) .corner { --lh: 11mm; --c: 1; }
 /* keep the end of the right panel and of the page clear of the logo */
 .tab-panel { padding-bottom: 30mm; }
 @media (max-width: 860px) {
-  .corner { right: 4mm; bottom: 4mm; --lh: 10mm; }
-  body:not([data-view='home']) .corner { --lh: 7mm; }
+  .corner { right: 4mm; bottom: 4mm; --lh: 7mm; }
 }
