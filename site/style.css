@@ -730,3 +730,5 @@ a.st-bad, .row.st-bad a { color: var(--dim) !important; }
 .btn-ai { flex: none; padding: 1.8mm 3.5mm 1.8mm 3mm; border-width: 2.5px; font-size: 3.4mm; --accent: var(--teal); }
 .btn-ai-s { display: none; }
 @media (max-width: 1100px) { .btn-ai-l { display: none; } .btn-ai-s { display: inline; } }
+
+.gh-btn svg { fill: currentColor; stroke: none; width: 5.2mm; height: 5.2mm; }

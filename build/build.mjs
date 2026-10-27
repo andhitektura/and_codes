@@ -472,7 +472,9 @@ const aiVars = {
 const aiPath = path.join(DIST, 'ai-instructions.md');
 fs.writeFileSync(aiPath, fs.readFileSync(aiPath, 'utf8').replace(/\{\{(\w+)\}\}/g, (m, k) => (k in aiVars ? String(aiVars[k]) : m)));
 const indexHtml = path.join(DIST, 'index.html');
-fs.writeFileSync(indexHtml, fs.readFileSync(indexHtml, 'utf8').replaceAll('{{TITLE}}', escapeHtml(config.title)));
+fs.writeFileSync(indexHtml, fs.readFileSync(indexHtml, 'utf8')
+  .replaceAll('{{TITLE}}', escapeHtml(config.title))
+  .replaceAll('{{REPO_URL}}', escapeHtml(config.repo ? `https://github.com/${config.repo}` : '#/')));
 
 const { index: pf } = await pagefind.createIndex({ forceLanguage: config.language || 'mk' });
 for (const r of records) await pf.addCustomRecord(r);
