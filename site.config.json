@@ -1,0 +1,6 @@
+{
+  "title": "ANDhitektura — Прописи",
+  "home": "index",
+  "frontmatterChips": ["type", "gazette", "status", "valid_from"],
+  "ignore": ["templates", "Templates"]
+}
