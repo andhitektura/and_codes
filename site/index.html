@@ -14,7 +14,6 @@
   <a class="skip" href="#main">Прескокни до содржината</a>
   <div class="app">
     <nav class="rail" id="left" aria-label="Прописи">
-      <a class="brand" href="#/" title="{{TITLE}}"><img src="brand/mark.svg" alt="AND"><span>_codes</span></a>
       <div class="countries" id="countries"></div>
       <ul class="rail-root" id="rail-root"></ul>
       <ol class="themes" id="themes"></ol>
@@ -43,11 +42,15 @@
     </nav>
 
     <header class="topbar">
-      <button class="icon-btn only-narrow" id="toggle-left" aria-label="Прописи" title="Прописи"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"/></svg></button>
+      <div class="top-left">
+        <button class="icon-btn only-narrow" id="toggle-left" aria-label="Прописи" title="Прописи"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"/></svg></button>
+        <a class="brand" href="#/" title="{{TITLE}}"><img src="brand/mark.svg" alt="AND"><span>_codes</span></a>
+      </div>
       <div class="search-wrap">
         <label class="search-pill">
           <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10" cy="10" r="6.5"/><path d="M15 15l5.5 5.5"/></svg>
-          <input id="search" type="search" placeholder="пребарај прописи и членови  (Ctrl+K)" autocomplete="off" spellcheck="false">
+          <input id="search" type="search" placeholder="Пребарај прописи, членови, поими…" autocomplete="off" spellcheck="false">
+          <kbd class="search-kbd">Ctrl K</kbd>
         </label>
         <div id="search-results" class="search-results" hidden>
           <div class="search-filters">
@@ -57,8 +60,10 @@
           <div id="search-list"></div>
         </div>
       </div>
+      <div class="top-right">
       <button class="btn btn-ai" data-act="copy-ai" title="Копирај ги упатствата за AI асистент: како да ја користи базата"><span class="btn-dot"></span><span class="btn-ai-l">Копирај AI упатства</span><span class="btn-ai-s">AI</span></button>
       <button class="icon-btn only-medium" id="toggle-right" aria-label="Алатки" title="Алатки"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M15 4v16"/></svg></button>
+      </div>
     </header>
 
     <main class="main" id="main" tabindex="-1">
