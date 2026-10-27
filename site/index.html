@@ -18,6 +18,28 @@
       <div class="countries" id="countries"></div>
       <ul class="rail-root" id="rail-root"></ul>
       <ol class="themes" id="themes"></ol>
+      <details class="legend" id="legend">
+        <summary>Легенда</summary>
+        <dl>
+          <dt>Акт</dt>
+          <dd><span class="lg-dot st-ok"></span>важечки</dd>
+          <dd><span class="lg-dot st-warn"></span>за проверка</dd>
+          <dd><span class="lg-dot st-bad"></span>престанал да важи</dd>
+          <dd><span class="lg-dot"></span>повлечен запис</dd>
+          <dt>Член</dt>
+          <dd><span class="lg-sym lg-here">+ Член 59</span>членот што го читаш</dd>
+          <dd><span class="lg-sym lg-del">Член 49</span>избришан или укинат</dd>
+          <dd><span class="lg-sym">А</span>проверен дословно според еден извор</dd>
+          <dd><span class="lg-sym">Б</span>проверен според официјален пречистен текст</dd>
+          <dd><span class="lg-sym">В</span>верижна примена на измени</dd>
+          <dt>Врски</dt>
+          <dd><span class="lg-sym lg-out">→</span>упатува на</dd>
+          <dd><span class="lg-sym lg-in">←</span>упатено од</dd>
+          <dd><span class="lg-sym">↻</span>веќе е во гранката</dd>
+          <dd><span class="lg-sym lg-fn">[12]</span>фуснота со историја на измени</dd>
+          <dd><span class="lg-sym lg-broken">ИНСТРУКЦИЈА</span>необјавена белешка</dd>
+        </dl>
+      </details>
     </nav>
 
     <header class="topbar">
@@ -35,6 +57,7 @@
           <div id="search-list"></div>
         </div>
       </div>
+      <button class="btn btn-ai" data-act="copy-ai" title="Копирај ги упатствата за AI асистент: како да ја користи базата"><span class="btn-dot"></span><span class="btn-ai-l">Копирај AI упатства</span><span class="btn-ai-s">AI</span></button>
       <button class="icon-btn only-medium" id="toggle-right" aria-label="Алатки" title="Алатки"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M15 4v16"/></svg></button>
     </header>
 

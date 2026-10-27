@@ -374,41 +374,78 @@ $('.tabs').addEventListener('click', (e) => {
   if (b) showTab(b.dataset.tab);
 });
 
+// The table of contents is the act's outline as a collapsible tree, like Obsidian's: ## > ### > #### > членови.
 let tocObserver;
+function outlineOf(n, data) {
+  if (n.act >= 0) return acts[n.act].o;
+  return data.sec.filter((s) => s.a).map((s) => [s.v || (s.k === 'member' ? 7 : 2), s.l, s.a]);
+}
+function tocTree(items) {
+  const root = { level: 0, children: [] };
+  const stack = [root];
+  for (const it of items) {
+    const node = typeof it === 'number' ? { level: 99, unit: it } : { level: it[0], label: it[1], anchor: it[2] };
+    node.children = [];
+    while (stack.length > 1 && stack[stack.length - 1].level >= node.level) stack.pop();
+    stack[stack.length - 1].children.push(node);
+    stack.push(node);
+  }
+  return root.children;
+}
 function renderToc(n, data) {
   tocObserver?.disconnect();
   const box = $('#toc');
   const a = actOf(n);
-  if (a && n.kind !== 'master') {
-    // Inside an act: the act's членови, in the order of the master.
-    box.innerHTML = `<p class="toc-act"><a href="${hrefOf(a.m)}">${esc(a.c)} ${esc(a.t)}</a></p>
-      <ol class="toc">${a.u.map(([u]) => `<li class="m ${statusClass(N[u])}"><a class="wl" href="${hrefOf(u)}" data-k="${u}" data-toc="${u}">${esc(N[u].label)}</a></li>`).join('')}</ol>`;
-    return;
-  }
-  const items = data.sec.filter((s) => s.a);
-  box.innerHTML = items.length
-    ? `<ol class="toc">${items.map((s) => `<li class="${s.k === 'member' ? 'm' : 'h'}"><a href="${hrefOf(`${n.i}#${s.a}`)}" data-anchor="${esc(s.a)}">${esc(s.l)}</a></li>`).join('')}</ol>`
-    : '<p class="hint">Оваа белешка нема членови или наслови.</p>';
-  tocObserver = new IntersectionObserver((entries) => {
-    for (const en of entries) {
-      if (!en.isIntersecting) continue;
-      const link = $(`#toc a[data-anchor="${CSS.escape(en.target.id.slice(2))}"]`);
-      if (!link) continue;
-      $$('#toc a.active').forEach((x) => x.classList.remove('active'));
-      link.classList.add('active');
-      link.scrollIntoView({ block: 'nearest' });
+  const onMaster = n.kind === 'master';
+  const items = outlineOf(n, data);
+  if (!items.length) { box.innerHTML = '<p class="hint">Оваа белешка нема наслови ни членови.</p>'; return; }
+  const linkOf = (node) => {
+    if (node.unit != null) {
+      const u = N[node.unit];
+      const anchor = unitPos.get(node.unit)?.anchor;
+      const href = onMaster && anchor ? hrefOf(`${n.i}#${anchor}`) : hrefOf(node.unit);
+      return `<a class="${statusClass(u)}" href="${href}" data-k="${node.unit}" data-toc="${node.unit}" ${anchor ? `data-anchor="${esc(anchor)}"` : ''}>${esc(u.label)}</a>`;
     }
+    const owner = a ? a.m : n.i;
+    return `<a class="toc-h" href="${hrefOf(`${owner}#${node.anchor}`)}" data-anchor="${esc(node.anchor)}">${esc(node.label)}</a>`;
+  };
+  const html = (nodes) => `<ul>${nodes.map((node) => `
+    <li class="${node.children.length ? 'has-kids collapsed' : ''} ${node.unit != null ? 'is-unit' : `lvl-${Math.min(node.level, 6)}`}">
+      <div class="orow">${node.children.length ? '<button class="tw" data-act="toc-toggle" aria-label="Отвори">▾</button>' : '<span class="tw-space"></span>'}${linkOf(node)}</div>
+      ${node.children.length ? html(node.children) : ''}
+    </li>`).join('')}</ul>`;
+  box.innerHTML = `<div class="panel-head toc-head">
+      ${a ? `<a class="toc-act" href="${hrefOf(a.m)}">${esc(a.c)} · ${esc(a.t)}</a>` : ''}
+      <span class="toc-tools"><button class="btn ghost" data-act="toc-all" data-open="1">отвори сè</button><button class="btn ghost" data-act="toc-all" data-open="0">собери</button></span>
+    </div><div class="otree">${html(tocTree(items))}</div>`;
+  // The top level stays open, so the act's parts are visible at once.
+  $$('.otree > ul > li.has-kids', box).forEach((li) => li.classList.remove('collapsed'));
+  // On a page with its own sections, the entry in view follows the scroll.
+  if (!onMaster && n.kind !== 'note') return;
+  tocObserver = new IntersectionObserver((entries) => {
+    for (const en of entries) if (en.isIntersecting) markToc($(`#toc a[data-anchor="${CSS.escape(en.target.id.slice(2))}"]`), false);
   }, { root: main, rootMargin: '0px 0px -70% 0px' });
-  $$('section.sec[id]', main).forEach((s) => tocObserver.observe(s));
+  $$('section.sec[id]', main).forEach((sec) => tocObserver.observe(sec));
+}
+/** Highlights a table-of-contents entry and opens the branches above it. */
+function markToc(link, center = true) {
+  if (!link) return;
+  $$('#toc a.active').forEach((x) => x.classList.remove('active'));
+  link.classList.add('active');
+  for (let li = link.closest('li'); li; li = li.parentElement.closest('li')) if (li !== link.closest('li')) li.classList.remove('collapsed');
+  link.scrollIntoView({ block: center ? 'center' : 'nearest' });
 }
 function markTocCurrent() {
   if (current.i == null) return;
-  const a = $(`#toc a[data-toc="${current.i}"]`);
-  if (!a) return;
-  $$('#toc a.active').forEach((x) => x.classList.remove('active'));
-  a.classList.add('active');
-  a.scrollIntoView({ block: 'center' });
+  if (current.anchor) markToc($(`#toc a[data-anchor="${CSS.escape(current.anchor)}"]`));
+  else markToc($(`#toc a[data-toc="${current.i}"]`));
 }
+$('#toc').addEventListener('click', (e) => {
+  const t = e.target.closest('[data-act="toc-toggle"]');
+  if (t) { t.closest('li').classList.toggle('collapsed'); return; }
+  const all = e.target.closest('[data-act="toc-all"]');
+  if (all) $$('#toc li.has-kids').forEach((li) => li.classList.toggle('collapsed', all.dataset.open !== '1'));
+});
 
 function renderLinks() {
   const box = $('#links');
@@ -724,7 +761,8 @@ document.addEventListener('click', (e) => {
 // ---------- rail: countries, themes on the line, acts as cards ----------
 
 const naturally = (a, b) => a.localeCompare(b, 'mk', { numeric: true });
-const ACCENTS = ['var(--red)', 'var(--teal)', 'var(--green)', 'var(--yellow)'];
+// One colour per theme along the line: the studio's four accents and the hues between them.
+const THEME_COLORS = ['#e1e1e1', '#e14b4b', '#e8833a', '#f0c84b', '#a9c25a', '#46a064', '#3db39e', '#64aaaa', '#5b9bd5', '#7d84d8', '#a77ed6', '#d278bd', '#e07a8f', '#c09a6b', '#9fb0bf'];
 const sentence = (s) => s.charAt(0) + s.slice(1).toLowerCase();
 
 const countries = [...new Set(index.folders.map((f) => f.split('/')[0]))].sort(naturally);
@@ -739,7 +777,7 @@ for (const f of index.folders) {
   const num = m ? m[1] : '';
   const t = {
     dir, country: p[0], num, name: sentence(m ? m[2] : p[1]),
-    accent: num && Number(num) > 0 ? ACCENTS[(Number(num) - 1) % 4] : 'var(--ink)',
+    accent: num ? THEME_COLORS[Number(num) % THEME_COLORS.length] : 'var(--ink)',
     moc: null, groups: new Map(), acts: 0, units: 0,
   };
   themes.push(t);
@@ -945,6 +983,12 @@ document.addEventListener('click', async (e) => {
     case 'copy-tree': await copyText(treeAsText()); toast('Дрвото е копирано'); break;
     case 'clear-tree': treeRoot = null; session.set('treeRoot', ''); renderTree(); break;
     case 'copy-pins': await copyPins(); break;
+    case 'copy-ai': {
+      const text = await fetch('ai-instructions.md').then((r) => r.text());
+      await copyText(text);
+      toast(`AI упатствата се копирани (${Math.round(text.length / 1000)} илјади знаци)`);
+      break;
+    }
     case 'clear-pins': pins = []; savePins(); syncPins(); break;
     case 'collapse-pin': {
       const card = b.closest('.pin-card');
@@ -976,6 +1020,9 @@ $('#toggle-right').addEventListener('click', () => document.body.classList.toggl
 // ---------- start ----------
 
 renderRail();
+const legend = $('#legend');
+legend.open = local.get('legend') === '1';
+legend.addEventListener('toggle', () => local.set('legend', legend.open ? '1' : '0'));
 showTab(local.get('tab') || 'toc');
 syncPins();
 renderTree();

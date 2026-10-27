@@ -325,7 +325,7 @@ function renderNote(n) {
     if (s.kind === 'pre' && !stripTags(html) && !/<img|class="embed"/.test(html)) continue;
     if (s.unit != null && n.kind === 'master') unitAnchorInMaster.set(s.unit, anchor);
     if (anchor) sectionLabels.set(`${n.i}#${anchor}`, s.label);
-    out.push({ a: anchor, l: s.label, k: s.kind, h: html, ...(s.unit != null ? { x: s.unit } : {}) });
+    out.push({ a: anchor, l: s.label, k: s.kind, h: html, ...(anchor ? { v: s.level } : {}), ...(s.unit != null ? { x: s.unit } : {}) });
   }
   return out;
 }
@@ -430,7 +430,12 @@ const json = (o) => JSON.stringify(o, (k, v) => (v instanceof Date ? v.toISOStri
 const index = {
   site: { title: config.title, home: homeNote ? homeNote.i : null, metaSections: [...META_SECTIONS] },
   folders,
-  acts: acts.map((a) => ({ c: a.code, t: a.name, m: a.master, s: a.status, u: a.units.map((i) => [i, unitAnchorInMaster.get(i) || '']) })),
+  acts: acts.map((a) => ({
+    c: a.code, t: a.name, m: a.master, s: a.status,
+    u: a.units.map((i) => [i, unitAnchorInMaster.get(i) || '']),
+    // The master's outline for the table of contents: [level, label, anchor] per heading, a note index per член.
+    o: bundles.get(`m:${a.master}`).items[a.master].sec.filter((x) => x.a).map((x) => (x.x != null ? x.x : [x.v, x.l, x.a])),
+  })),
   // [folder, file name, label, kind, act, bundle, status]
   notes: notes.map((n) => [folderIdx.get(n.dir), n.base, n.label, KIND_CHAR[n.kind], n.act, bundleOf(n).id, n.fm['статус'] ? String(n.fm['статус']) : '']),
   edges: [...edges].map((e) => e.split('\u0001').map((k) => (/^\d+$/.test(k) ? Number(k) : k))),
@@ -448,6 +453,24 @@ for (const rel of assetFiles) {
 }
 
 fs.cpSync(SITE, DIST, { recursive: true });
+
+// The AI instructions: the template with the live register of acts.
+const cell = (v) => String(v ?? '').replace(/\|/g, '\\|');
+const register = acts
+  .map((a) => `| ${cell(a.code)} | ${cell(a.name)} | ${cell(a.status)} | ${a.units.length} | \`${cell(notes[a.master].rel)}\` |`)
+  .join('\n');
+const aiVars = {
+  ACT_COUNT: acts.length,
+  UNIT_COUNT: notes.filter((n) => n.kind === 'unit').length,
+  BUILT: new Date().toISOString().slice(0, 10),
+  SITE: config.siteUrl || '',
+  REPO: config.repo || '',
+  BRANCH: config.branch || 'main',
+  CONTENT: config.contentDir || 'content',
+  REGISTER: register,
+};
+const aiPath = path.join(DIST, 'ai-instructions.md');
+fs.writeFileSync(aiPath, fs.readFileSync(aiPath, 'utf8').replace(/\{\{(\w+)\}\}/g, (m, k) => (k in aiVars ? String(aiVars[k]) : m)));
 const indexHtml = path.join(DIST, 'index.html');
 fs.writeFileSync(indexHtml, fs.readFileSync(indexHtml, 'utf8').replaceAll('{{TITLE}}', escapeHtml(config.title)));
 
