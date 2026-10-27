@@ -62,5 +62,31 @@
   },
   "siteUrl": "https://andhitektura.github.io/and_codes/",
   "repo": "andhitektura/and_codes",
-  "branch": "main"
+  "branch": "main",
+  "rootNotes": [
+    {
+      "note": "00 MOC — Регистар на прописи",
+      "label": "Регистар на прописи",
+      "text": "сите акти по теми, со статус",
+      "group": "start",
+      "icon": "list"
+    },
+    {
+      "note": "Преглед на постапка - планирање, градење, употреба",
+      "label": "Преглед на постапка",
+      "text": "од план до употреба: кој член важи каде",
+      "group": "start",
+      "icon": "flow"
+    },
+    {
+      "note": "00 Методологија и ограничувања",
+      "label": "Методологија и ограничувања",
+      "group": "about"
+    },
+    {
+      "note": "00 Regulatory Framework",
+      "label": "Regulatory Framework",
+      "group": "about"
+    }
+  ]
 }

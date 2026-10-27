@@ -345,8 +345,46 @@ async function renderNote(i) {
     }
   }
   fillEmbeds(main, 0);
+  renderDiagrams(main);
   renderToc(n, data);
   document.title = `${n.label} — ${index.site.title}`;
+}
+
+// ```mermaid blocks become diagrams, drawn in the site's palette and typeface.
+let mermaidReady = null;
+async function renderDiagrams(root) {
+  const blocks = $$('pre > code.language-mermaid', root);
+  if (!blocks.length) return;
+  mermaidReady ||= new Promise((resolve, reject) => {
+    const script = document.createElement('script');
+    script.src = 'vendor/mermaid.min.js';
+    script.onload = () => {
+      window.mermaid.initialize({
+        startOnLoad: false,
+        theme: 'base',
+        fontFamily: 'and_Lubrifont, system-ui, sans-serif',
+        themeVariables: {
+          background: '#232323', primaryColor: '#2c2c2c', primaryTextColor: '#e1e1e1', primaryBorderColor: '#afafaf',
+          secondaryColor: '#1c1c1c', tertiaryColor: '#1c1c1c', lineColor: '#afafaf', textColor: '#e1e1e1',
+          fontSize: '15px', edgeLabelBackground: '#232323',
+        },
+        // Natural size, scrolled sideways when wider than the page: wide flowcharts stay readable.
+        flowchart: { curve: 'basis', padding: 14, useMaxWidth: false },
+      });
+      resolve(window.mermaid);
+    };
+    script.onerror = reject;
+    document.head.append(script);
+  });
+  const mermaid = await mermaidReady;
+  const nodes = blocks.map((code) => {
+    const div = document.createElement('div');
+    div.className = 'diagram mermaid';
+    div.textContent = code.textContent;
+    code.parentElement.replaceWith(div);
+    return div;
+  });
+  try { await mermaid.run({ nodes }); } catch (e) { console.warn('diagram', e); }
 }
 
 async function fillEmbeds(root, depth) {
@@ -820,11 +858,35 @@ function actCard(ai) {
 }
 
 let railCountry = countries[0];
+
+// The notes outside the themes. site.config.json → rootNotes names them and sorts them into
+// "start" (cards at the top of the rail) and "about" (links at the bottom); any other note there goes to "about".
+const ROOT_ICONS = {
+  list: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6h11M9 12h11M9 18h11"/><circle cx="4.5" cy="6" r="1.4"/><circle cx="4.5" cy="12" r="1.4"/><circle cx="4.5" cy="18" r="1.4"/></svg>',
+  flow: '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="2.5" y="3.5" width="7" height="5" rx="1.2"/><rect x="14.5" y="15.5" width="7" height="5" rx="1.2"/><path d="M6 8.5v5a2.5 2.5 0 0 0 2.5 2.5h6M12 13.5l2.5 2.5-2.5 2.5"/></svg>',
+  note: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h8l4 4v14H6z"/><path d="M14 3v4h4M9 12h6M9 16h6"/></svg>',
+};
+const START_ACCENTS = ['var(--red)', 'var(--yellow)', 'var(--teal)', 'var(--green)'];
+function rootNotesOf(country) {
+  const cfg = (index.site.rootNotes || []).filter((r) => N[r.i]?.dir === country);
+  const named = new Set(cfg.map((r) => r.i));
+  const start = cfg.filter((r) => r.group === 'start').map((r, k) => ({ ...r, accent: START_ACCENTS[k % START_ACCENTS.length] }));
+  const about = [
+    ...cfg.filter((r) => r.group !== 'start'),
+    ...N.filter((n) => n.dir === country && !named.has(n.i)).sort((a, b) => naturally(a.base, b.base)).map((n) => ({ i: n.i, label: n.label })),
+  ];
+  return { start, about };
+}
 function renderRail() {
   $('#countries').innerHTML = countries.map((c) => `<a class="country${c === railCountry ? ' is-active' : ''}" href="#/" data-country="${esc(c)}">${esc(c)}</a>`).join('');
-  $('#rail-root').innerHTML = N.filter((n) => n.dir === railCountry)
-    .sort((a, b) => naturally(a.base, b.base))
-    .map((n) => `<li><a href="${hrefOf(n.i)}" data-i="${n.i}">${esc(n.label)}</a></li>`).join('');
+  const { start, about } = rootNotesOf(railCountry);
+  $('#rail-start').innerHTML = start.length ? `<p class="rail-label">Почни тука</p>
+    <ul class="act-list start-list">${start.map((r) => `<li class="pt" data-root-i="${r.i}" style="--accent:${r.accent}"><a href="${hrefOf(r.i)}">
+      <span class="pt-frame pt-icon">${ROOT_ICONS[r.icon] || ROOT_ICONS.note}</span>
+      <span class="pt-card"><span class="pt-title">${esc(r.label)}</span>${r.text ? `<span class="pt-text">${esc(r.text)}</span>` : ''}</span>
+    </a></li>`).join('')}</ul>` : '';
+  $('#rail-about').innerHTML = about.length ? `<p class="rail-label">За базата</p>
+    <ul class="about-list">${about.map((r) => `<li><a href="${hrefOf(r.i)}" data-i="${r.i}">${esc(r.label)}</a></li>`).join('')}</ul>` : '';
   $('#themes').innerHTML = themes.filter((t) => t.country === railCountry).map((t) => `
     <li class="theme" data-theme="${esc(t.dir)}" style="--accent:${t.accent}">
       <a class="th-head" href="${t.moc != null ? hrefOf(t.moc) : '#/'}" data-theme-head="${esc(t.dir)}">
@@ -845,7 +907,8 @@ function markRail() {
   document.documentElement.style.setProperty('--accent', t ? t.accent : 'var(--ink)');
   for (const el of $$('#themes .theme')) el.classList.toggle('is-active', !!t && el.dataset.theme === t.dir);
   for (const el of $$('#themes .pt.is-current')) { el.classList.remove('is-current'); $('.pt-here', el).textContent = ''; }
-  for (const el of $$('#rail-root a')) el.classList.toggle('is-current', n != null && Number(el.dataset.i) === n.i);
+  for (const el of $$('#rail-about a')) el.classList.toggle('is-current', n != null && Number(el.dataset.i) === n.i);
+  for (const el of $$('#rail-start .pt')) el.classList.toggle('is-current', n != null && Number(el.dataset.rootI) === n.i);
   if (!n || n.act < 0) return;
   const card = $(`#themes .pt[data-act-i="${n.act}"]`);
   if (!card) return;
@@ -875,7 +938,7 @@ $('#countries').addEventListener('click', (e) => {
 // ---------- home ----------
 
 function renderHome() {
-  const roots = N.filter((x) => x.dir === railCountry).sort((a, b) => (a.kind === 'moc' ? -1 : b.kind === 'moc' ? 1 : naturally(a.base, b.base)));
+  const { start, about } = rootNotesOf(railCountry);
   const list = themes.filter((t) => t.country === railCountry);
   const totalActs = list.reduce((s, t) => s + t.acts, 0);
   const totalUnits = list.reduce((s, t) => s + t.units, 0);
@@ -883,7 +946,14 @@ function renderHome() {
     <div class="eyebrow"><span>Прописи</span><span>Членови</span><span>Врски</span><span>Белешки</span></div>
     <h1>and_codes</h1>
     <p class="lead">Консолидираните прописи на студиото: ${plural(totalActs, 'акт', 'акти')} и ${plural(totalUnits, 'член', 'членови')}, секој член со своите врски. Лебди врз упатување за преглед, закачи членови во сесијата и следи ги врските во дрвото.</p>
-    <div class="home-links">${roots.map((r) => `<a class="btn" href="${hrefOf(r.i)}"><span class="btn-dot"></span>${esc(r.label.replace(/^00 — /, ''))}</a>`).join('')}</div>
+    <div class="home-start">${start.map((r) => `
+      <a class="tile tile-start" href="${hrefOf(r.i)}" style="--accent:${r.accent}">
+        <span class="tile-frame">${ROOT_ICONS[r.icon] || ROOT_ICONS.note}</span>
+        <span class="tile-card"><span class="tile-dot"></span><span class="tile-title">${esc(r.label)}</span>${r.text ? `<span class="tile-text">${esc(r.text)}</span>` : ''}</span>
+      </a>`).join('')}
+    </div>
+    ${about.length ? `<p class="home-about">За базата: ${about.map((r) => `<a href="${hrefOf(r.i)}">${esc(r.label)}</a>`).join(' · ')}</p>` : ''}
+    <p class="rail-label home-themes">Теми</p>
     <div class="tiles">${list.map((t) => `
       <a class="tile" href="${t.moc != null ? hrefOf(t.moc) : '#/'}" style="--accent:${t.accent}">
         <span class="tile-frame">${esc(t.num)}</span>
