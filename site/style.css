@@ -223,7 +223,7 @@ svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width:
 
 /* acts: a numbered frame and a grey card, as in the andhitektura.com corner panel */
 .act-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2.5mm; }
-.pt > a { display: grid; grid-template-columns: 13mm minmax(0, 1fr); align-items: center; text-decoration: none; }
+.pt > a { display: grid; grid-template-columns: 13mm minmax(0, 1fr); column-gap: 1.6mm; align-items: center; text-decoration: none; }
 .pt-frame {
   position: relative;
   z-index: 1;
@@ -245,11 +245,10 @@ svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width:
 .pt-card {
   position: relative;
   min-height: 11mm;
-  margin-left: -2.5px;
   padding: 1.5mm 6mm 1.5mm 2.5mm;
   background: var(--card);
   color: var(--card-ink);
-  border-radius: 0 6px 6px 0;
+  border-radius: 7px;
   display: flex;
   flex-direction: column;
   justify-content: center;
@@ -521,9 +520,9 @@ pre code { background: none; padding: 0; }
 .home-themes { margin-bottom: 4mm; }
 
 .tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(78mm, 1fr)); gap: 8mm 10mm; }
-.tile { position: relative; display: block; text-decoration: none; color: inherit; }
+.tile { position: relative; display: grid; grid-template-columns: 20mm minmax(0, 1fr); column-gap: 2.5mm; align-items: center; text-decoration: none; color: inherit; }
 .tile-frame {
-  position: absolute; z-index: 1; left: 0; top: 0; width: 20mm; height: 20mm;
+  position: relative; z-index: 1; width: 20mm; height: 20mm;
   display: grid; place-items: center; background: var(--bg);
   border: 3px solid var(--ink); border-radius: 9px;
   font-size: 6.5mm; font-weight: 700; color: var(--accent);
@@ -531,13 +530,13 @@ pre code { background: none; padding: 0; }
 }
 .tile-card {
   display: block;
-  position: relative; min-height: 26mm; margin: 4mm 0 0 4mm; padding: 3mm 8mm 3mm 20mm;
-  background: var(--card); color: var(--card-ink); border-radius: 4px 12px 12px 12px;
+  position: relative; min-height: 22mm; padding: 3mm 8mm 3mm 4mm;
+  background: var(--card); color: var(--card-ink); border-radius: 12px;
 }
 .tile-dot { position: absolute; top: 3mm; right: 3mm; width: 2.5mm; height: 2.5mm; border-radius: 50%; background: var(--accent); box-shadow: 0 0 0 1.5px var(--card-ink); }
 .tile-title { display: block; font-size: 4.6mm; font-weight: 700; line-height: 1.15; }
 .tile-text { display: block; margin-top: 1.5mm; font-size: 3.3mm; font-weight: 700; opacity: 0.7; }
-.tile:hover .tile-frame { transform: translate(-5px, -5px); }
+.tile:hover .tile-frame { transform: translateX(-5px); }
 .tile:hover .tile-dot { animation: blink 0.9s steps(2) infinite; }
 @keyframes blink { 50% { opacity: 0.2; } }
 
@@ -580,7 +579,7 @@ select {
 
 /* pins: numbered frames and grey cards */
 .pin-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 4mm; counter-reset: pin; }
-.pin-card { position: relative; padding-left: 9mm; }
+.pin-card { position: relative; padding-left: 14mm; }
 .pin-card::before {
   counter-increment: pin;
   content: counter(pin, decimal-leading-zero);
@@ -591,21 +590,21 @@ select {
 }
 .pc-head {
   display: flex; align-items: center; gap: 0.5mm; min-height: 12mm;
-  margin-top: 2mm; padding: 1mm 1mm 1mm 5mm;
-  background: var(--card); color: var(--card-ink); border-radius: 4px 12px 0 0;
+  padding: 1mm 1mm 1mm 4mm;
+  background: var(--card); color: var(--card-ink); border-radius: 10px 10px 0 0;
 }
 .pc-head a { flex: 1; min-width: 0; border-bottom: 0; line-height: 1.2; color: var(--card-ink); }
 .pc-head .tl-n { color: #4b4b4b; }
 .pc-head .act, .pc-head .tw { color: var(--card-ink); }
 .pc-head .act:hover, .pc-head .tw:hover { background: rgb(0 0 0 / 0.12); }
 .pc-body {
-  padding: 2mm 4mm 3mm 5mm; font-size: 3.7mm; max-height: 90mm; overflow: auto;
-  background: #c4c4c4; color: var(--card-ink); border-radius: 0 0 12px 12px;
+  padding: 2mm 4mm 3mm 4mm; font-size: 3.7mm; max-height: 90mm; overflow: auto;
+  background: #c4c4c4; color: var(--card-ink); border-radius: 0 0 10px 10px;
 }
 .pc-body a.wl { color: var(--card-ink); border-bottom-color: rgb(35 35 35 / 0.4); }
 .pc-body p { margin: 0 0 2mm; }
 .pin-card.collapsed .pc-body { display: none; }
-.pin-card.collapsed .pc-head { border-radius: 4px 12px 12px 12px; }
+.pin-card.collapsed .pc-head { border-radius: 10px; }
 .pin-card.collapsed .tw { transform: rotate(-90deg); }
 .tw {
   width: 6mm; height: 6mm; flex: none; border: 0; background: none; cursor: pointer; color: var(--dim);
