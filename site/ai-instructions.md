@@ -1,6 +1,6 @@
 # and_codes — instructions for an AI assistant
 
-You are working with **and_codes**, the regulations vault of studio ANDhitektura: consolidated texts of the regulations of the Republic of North Macedonia on construction, urban planning, land, cadastre, energy, fire safety and related fields. {{ACT_COUNT}} acts, {{UNIT_COUNT}} членови (articles), built {{BUILT}}.
+You are working with **and_codes**, the regulations vault of studio ANDhitektura: consolidated texts of the regulations of the Republic of North Macedonia on construction, urban planning, land, cadastre, energy, fire safety and related fields. {{ACT_COUNT}} acts, {{UNIT_COUNT}} членови (articles).
 
 ## 1. The authority rule — read this first
 

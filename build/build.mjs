@@ -469,7 +469,6 @@ const register = acts
 const aiVars = {
   ACT_COUNT: acts.length,
   UNIT_COUNT: notes.filter((n) => n.kind === 'unit').length,
-  BUILT: new Date().toISOString().slice(0, 10),
   SITE: config.siteUrl || '',
   REPO: config.repo || '',
   BRANCH: config.branch || 'main',
@@ -477,7 +476,10 @@ const aiVars = {
   REGISTER: register,
 };
 const aiPath = path.join(DIST, 'ai-instructions.md');
-fs.writeFileSync(aiPath, fs.readFileSync(aiPath, 'utf8').replace(/\{\{(\w+)\}\}/g, (m, k) => (k in aiVars ? String(aiVars[k]) : m)));
+const aiText = fs.readFileSync(aiPath, 'utf8').replace(/\{\{(\w+)\}\}/g, (m, k) => (k in aiVars ? String(aiVars[k]) : m));
+fs.writeFileSync(aiPath, aiText);
+// The same file at the repository root, where an AI reading the repository finds it. Commit it with vault changes.
+fs.writeFileSync(path.join(ROOT, 'AI-INSTRUCTIONS.md'), aiText);
 const indexHtml = path.join(DIST, 'index.html');
 fs.writeFileSync(indexHtml, fs.readFileSync(indexHtml, 'utf8')
   .replaceAll('{{TITLE}}', escapeHtml(config.title))

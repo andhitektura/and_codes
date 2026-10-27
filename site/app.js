@@ -1063,12 +1063,6 @@ document.addEventListener('click', async (e) => {
     case 'copy-tree': await copyText(treeAsText()); toast('Дрвото е копирано'); break;
     case 'clear-tree': treeRoot = null; session.set('treeRoot', ''); renderTree(); break;
     case 'copy-pins': await copyPins(); break;
-    case 'copy-ai': {
-      const text = await fetch('ai-instructions.md').then((r) => r.text());
-      await copyText(text);
-      toast(`AI упатствата се копирани (${Math.round(text.length / 1000)} илјади знаци)`);
-      break;
-    }
     case 'clear-pins': pins = []; savePins(); syncPins(); break;
     case 'collapse-pin': {
       const card = b.closest('.pin-card');
