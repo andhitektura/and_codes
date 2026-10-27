@@ -76,19 +76,19 @@ svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width:
   overflow-y: auto;
   scrollbar-width: thin;
   scrollbar-color: var(--line) transparent;
-  padding: 0 4mm 4mm 0;
+  padding: 0 4mm 0 0;
 }
 .brand {
-  display: flex;
-  align-items: flex-end;
-  gap: 1.5mm;
-  height: 8mm;
+  font-size: 7mm;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
   text-decoration: none;
   color: var(--ink);
+  transition: color 0.2s;
 }
-.brand img { height: 7mm; width: auto; display: block; }
-.brand span { font-size: 6.5mm; line-height: 0.9; letter-spacing: 0.01em; }
-.brand:hover span { color: var(--accent); }
+.brand:hover { color: var(--accent); }
 
 .countries { display: flex; gap: 2mm; padding: 2mm 0 0 7mm; }
 .country {
@@ -119,7 +119,7 @@ svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width:
 .rail-foot {
   /* the bottom-left corner: the notes about the vault and the legend, always in view */
   position: sticky; bottom: 0; z-index: 5;
-  margin: 6mm 0 0 6mm; padding: 3mm 0 0;
+  margin: 6mm 0 0 6mm; padding: 3mm 0 8mm; /* 8mm: the corner logo's distance from the bottom edge */
   background: linear-gradient(to bottom, transparent, var(--bg) 3mm);
 }
 .rail-about { padding: 0 0 2mm 1mm; }
@@ -349,6 +349,25 @@ svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width:
 }
 .search-filters label { display: inline-flex; gap: 2mm; align-items: center; cursor: pointer; }
 .search-filters input { accent-color: var(--yellow); }
+/* the acts in the results, as a legend of their codes and a filter */
+.search-tags { display: flex; flex-wrap: wrap; gap: 1.5mm; padding: 0 1mm 2.5mm; }
+.search-tags:empty { display: none; }
+.stag {
+  display: inline-flex; align-items: stretch; max-width: 100%;
+  border: 1.5px solid var(--line); border-radius: 999px; overflow: hidden; font-size: 3.1mm; line-height: 1.2;
+}
+.stag button {
+  display: inline-flex; align-items: center; gap: 1.5mm; min-width: 0; padding: 1mm 1.5mm 1mm 2.5mm;
+  border: 0; background: none; cursor: pointer; color: var(--mute); text-align: left;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 80mm;
+}
+.stag button::before { content: ''; flex: none; width: 1.8mm; height: 1.8mm; border-radius: 50%; background: var(--accent); }
+.stag b { color: var(--ink); flex: none; }
+.stag a { display: inline-grid; place-items: center; padding: 0 2mm; color: var(--dim); text-decoration: none; border-left: 1px solid var(--line); }
+.stag:hover { border-color: var(--mute); }
+.stag button:hover, .stag a:hover { color: var(--ink); background: var(--bg-3); }
+.stag.is-on { border-color: var(--accent); background: var(--bg-3); }
+.stag.is-on button { color: var(--ink); }
 .result { display: block; padding: 2.5mm 3mm; border-radius: 6px; text-decoration: none; color: var(--ink); }
 .result:hover, .result.active { background: var(--bg-3); }
 .result .rt { display: block; font-weight: 700; font-size: 4mm; line-height: 1.25; }
@@ -477,8 +496,7 @@ pre code { background: none; padding: 0; }
 /* ───────────── home ───────────── */
 
 .home { max-width: 230mm; margin: 0 auto; padding: 14mm 12mm 40mm; }
-.home h1 { font-size: 16mm; line-height: 1; margin: 2mm 0 5mm; font-weight: 700; }
-.home .lead { font-size: 5.2mm; line-height: 1.5; color: var(--mute); max-width: 160mm; margin: 0 0 6mm; }
+.home .lead { font-size: 5.6mm; line-height: 1.5; color: var(--mute); max-width: 160mm; margin: 4mm 0 6mm; }
 .home .eyebrow > :nth-child(1) { --accent: var(--red); }
 .home .eyebrow > :nth-child(2) { --accent: var(--teal); }
 .home .eyebrow > :nth-child(3) { --accent: var(--green); }
@@ -702,7 +720,6 @@ a.st-bad, .row.st-bad a { color: var(--dim) !important; }
   body.show-left .rail { transform: none; }
   .note, .home { padding: 4mm 4mm 30mm; }
   .note-head h1 { font-size: 8.5mm; }
-  .home h1 { font-size: 12mm; }
   span.acts { opacity: 1; }
   .tiles { grid-template-columns: minmax(0, 1fr); }
 }
@@ -736,7 +753,7 @@ a.st-bad, .row.st-bad a { color: var(--dim) !important; }
 /* ───────────── legend, bottom left ───────────── */
 
 .legend-btn {
-  display: inline-flex; align-items: center; gap: 2mm; margin: 1mm 0 0 1mm; padding: 1.5mm 3.5mm 1.5mm 2.5mm;
+  display: inline-flex; align-items: center; gap: 2mm; margin: 1mm 0 0 1mm; padding: 0 3.5mm 0 2.5mm; height: 9mm;
   border: 2px solid var(--line); border-radius: 999px; background: var(--bg-2); cursor: pointer;
   font-size: 2.9mm; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; color: var(--mute);
 }
@@ -746,7 +763,7 @@ a.st-bad, .row.st-bad a { color: var(--dim) !important; }
 .legend-btn:hover { color: var(--ink); }
 .legend {
   /* floats over the page from the bottom-left corner */
-  position: fixed; left: 6mm; bottom: 16mm; z-index: 45;
+  position: fixed; left: 7mm; bottom: 8mm; z-index: 45; /* opens on the legend button's baseline, level with the logo */
   width: min(84mm, calc(100vw - 12mm)); max-height: calc(100vh - var(--top-h) - 24mm); overflow: auto;
   padding: 3mm 4mm 4mm;
   background: var(--bg-2); border: 2px solid var(--ink); border-radius: 4px 12px 12px 12px;
@@ -782,3 +799,61 @@ a.st-bad, .row.st-bad a { color: var(--dim) !important; }
 
 /* keep the lit-up act clear of the bottom-left corner block when the rail scrolls to it */
 .rail .pt, .rail .th-head { scroll-margin: 4mm 0 48mm; }
+
+/* ───────────── the studio's logo in the corner (from andhitektura.com) ─────────────
+   One logo that morphs between the landing-page size (blocks, wordmark, four dots) and the compact tag
+   (blocks, the red dot in the D, the pin). Geometry in units of the block height --lh. */
+
+@property --c { syntax: '<number>'; inherits: true; initial-value: 0; }
+@property --lh { syntax: '<length>'; inherits: true; initial-value: 11mm; }
+.corner {
+  position: fixed; z-index: 25; right: 8mm; bottom: 8mm;
+  --lh: clamp(12mm, 4vw, 18mm);
+  --c: 0;
+  transition: --c 1s cubic-bezier(0.45, 0, 0.25, 1), --lh 1s cubic-bezier(0.45, 0, 0.25, 1);
+}
+body:not([data-view='home']) .corner { --lh: 11mm; --c: 1; }
+.logo-btn { position: relative; display: block; text-decoration: none; }
+.logo {
+  --g: min(1, calc(var(--c) * 2.5));
+  --t: max(0, calc((var(--c) - 0.3) / 0.7));
+  position: relative; display: block;
+  width: calc(var(--lh) * (7.39 - 3.58 * var(--t)));
+  height: calc(var(--lh) * (1 + 0.62 * var(--c)));
+  transform-origin: right bottom;
+  transition: transform 0.45s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.logo-btn:hover .logo { transform: scale(1.04); }
+.logo > * { position: absolute; }
+.logo-and { left: 0; top: 0; width: calc(var(--lh) * 3.2); height: var(--lh); }
+.logo-and svg { display: block; width: 100%; height: 100%; stroke: none; }
+.logo-type { left: calc(var(--lh) * 3.2); top: 0; width: calc(var(--lh) * 3.1 * (1 - var(--t))); height: var(--lh); overflow: hidden; }
+.logo-word { display: block; width: calc(var(--lh) * 3); height: 100%; margin-left: calc(var(--lh) * 0.1); fill: var(--mute); stroke: none; font: 300 70px var(--font); }
+.logo-dot {
+  --x: calc((6.57 + var(--k) * 0.25) * (1 - var(--g)) + 6.57 * var(--g));
+  left: calc(var(--lh) * (var(--x) * (1 - var(--t)) + 2.9 * var(--t)));
+  top: calc(var(--lh) * (0.72 - 0.02 * var(--t)));
+  width: calc(var(--lh) * 0.14); height: calc(var(--lh) * 0.14);
+  translate: -50% -50%; border-radius: 50%; background: var(--red);
+  scale: calc(1 - var(--g));
+}
+.logo-dot:first-of-type {
+  z-index: 1;
+  width: calc(var(--lh) * (0.14 + 0.09 * var(--t))); height: calc(var(--lh) * (0.14 + 0.09 * var(--t)));
+  scale: 1;
+}
+.logo-dot:nth-of-type(2) { background: var(--teal); }
+.logo-dot:nth-of-type(3) { background: var(--green); }
+.logo-dot:nth-of-type(4) { background: var(--yellow); }
+.logo-pin-h, .logo-pin-v {
+  translate: -50% -50%; border-radius: calc(var(--lh) * 0.05); background: var(--line);
+  opacity: calc(var(--c) * 3 - 2);
+}
+.logo-pin-h { left: calc(var(--lh) * 3.565); top: calc(var(--lh) * 0.7); width: calc(var(--lh) * 0.49); height: calc(var(--lh) * 0.18); }
+.logo-pin-v { left: calc(var(--lh) * 2.9); top: calc(var(--lh) * 1.375); width: calc(var(--lh) * 0.18); height: calc(var(--lh) * 0.49); }
+/* keep the end of the right panel and of the page clear of the logo */
+.tab-panel { padding-bottom: 30mm; }
+@media (max-width: 860px) {
+  .corner { right: 4mm; bottom: 4mm; --lh: 10mm; }
+  body:not([data-view='home']) .corner { --lh: 7mm; }
+}
