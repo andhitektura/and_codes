@@ -108,6 +108,11 @@ function contextOf(n) {
   if (a) return n.kind === 'master' ? a.c : `${a.c} · ${a.t}`;
   return n.dir.split('/').pop();
 }
+/** The category (theme) a note belongs to, e.g. "02 Градење", with the theme's colour on its dot. */
+function catHtml(n, cls = 'cat') {
+  const t = themeOf(n);
+  return t ? `<span class="${cls}" style="--accent:${t.accent}"><i></i>${esc(t.num ? `${t.num} ` : '')}${esc(t.name)}</span>` : '';
+}
 function citationOf(k) {
   const n = noteOf(k);
   const a = actOf(n);
@@ -547,7 +552,7 @@ function renderLinks() {
     for (const s of inAdj.get(k) || []) if (!ownSet.has(s) && !inner(s)) inc.push([s, k]);
     for (const t of outAdj.get(k) || []) if (!inner(t)) out.push([k, t]);
   }
-  const row = (link, via) => `<li><a class="wl" href="${hrefOf(link)}" data-k="${esc(link)}">${esc(labelOf(link))}</a>${via ? `<span class="via">${esc(via)}</span>` : ''}</li>`;
+  const row = (link, via) => `<li><a class="wl" href="${hrefOf(link)}" data-k="${esc(link)}">${esc(labelOf(link))}</a>${catHtml(noteOf(link))}${via ? `<span class="via">${esc(via)}</span>` : ''}</li>`;
   const viaOf = (k) => (k === String(n.i) ? '' : shortLabel(k));
   $('#links-meta').textContent = inc.length || out.length ? `←${inc.length} →${out.length}` : '';
   box.innerHTML = `
@@ -628,7 +633,7 @@ function renderPins() {
           <a class="pc-link" href="${hrefOf(k)}" title="${esc(citationOf(k))}">
             <span class="pm-frame">${esc(pinFrame(k))}</span>
             <span class="pm-card"><span class="pt-dot ${statusClass(n)}"></span>
-              <span class="pm-title">${esc(shortLabel(k))}</span><span class="pm-sub">${esc(contextOf(n))}</span></span>
+              <span class="pm-title">${esc(shortLabel(k))}</span><span class="pm-sub">${esc(contextOf(n))}</span>${catHtml(n, 'cat pm-cat')}</span>
           </a>
           <button class="act pm-x" type="button" data-act="pin" data-k="${esc(k)}" aria-pressed="true" title="Откачи" aria-label="Откачи">${ICON.x}</button>
           <button class="pc-toggle" type="button" data-act="toggle-pin" data-k="${esc(k)}" aria-expanded="${open}" title="Прикажи го текстот" aria-label="Прикажи го текстот"></button>
@@ -664,7 +669,7 @@ function setTreeRoot(k) {
 
 function treeLabel(k) {
   const n = noteOf(k);
-  return `<span class="tl-m">${esc(shortLabel(k))}</span><span class="tl-n">${esc(contextOf(n))}</span>`;
+  return `<span class="tl-m">${esc(shortLabel(k))}</span><span class="tl-n">${esc(contextOf(n))}</span>${catHtml(n)}`;
 }
 
 function renderTree() {
@@ -947,6 +952,7 @@ const ROOT_ICONS = {
   list: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6h11M9 12h11M9 18h11"/><circle cx="4.5" cy="6" r="1.4"/><circle cx="4.5" cy="12" r="1.4"/><circle cx="4.5" cy="18" r="1.4"/></svg>',
   flow: '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="2.5" y="3.5" width="7" height="5" rx="1.2"/><rect x="14.5" y="15.5" width="7" height="5" rx="1.2"/><path d="M6 8.5v5a2.5 2.5 0 0 0 2.5 2.5h6M12 13.5l2.5 2.5-2.5 2.5"/></svg>',
   note: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h8l4 4v14H6z"/><path d="M14 3v4h4M9 12h6M9 16h6"/></svg>',
+  info: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 11v6"/><circle cx="12" cy="7.6" r="0.6"/></svg>',
 };
 const START_ACCENTS = ['var(--red)', 'var(--yellow)', 'var(--teal)', 'var(--green)'];
 function rootNotesOf(country) {
@@ -954,7 +960,7 @@ function rootNotesOf(country) {
   const named = new Set(cfg.map((r) => r.i));
   const start = cfg.filter((r) => r.group === 'start').map((r, k) => ({ ...r, accent: START_ACCENTS[k % START_ACCENTS.length] }));
   const about = [
-    ...cfg.filter((r) => r.group !== 'start'),
+    ...cfg.filter((r) => r.group !== 'start' || r.button), // a start card can also be a button next to GitHub
     ...N.filter((n) => n.dir === country && !named.has(n.i)).sort((a, b) => naturally(a.base, b.base)).map((n) => ({ i: n.i, label: n.label })),
   ];
   return { start, about };
