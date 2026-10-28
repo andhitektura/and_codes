@@ -108,6 +108,11 @@ function contextOf(n) {
   if (a) return n.kind === 'master' ? a.c : `${a.c} · ${a.t}`;
   return n.dir.split('/').pop();
 }
+/** The category (theme) a note belongs to, e.g. "02 Градење", with the theme's colour on its dot. */
+function catHtml(n, cls = 'cat') {
+  const t = themeOf(n);
+  return t ? `<span class="${cls}" style="--accent:${t.accent}"><i></i>${esc(t.num ? `${t.num} ` : '')}${esc(t.name)}</span>` : '';
+}
 function citationOf(k) {
   const n = noteOf(k);
   const a = actOf(n);
@@ -547,7 +552,7 @@ function renderLinks() {
     for (const s of inAdj.get(k) || []) if (!ownSet.has(s) && !inner(s)) inc.push([s, k]);
     for (const t of outAdj.get(k) || []) if (!inner(t)) out.push([k, t]);
   }
-  const row = (link, via) => `<li><a class="wl" href="${hrefOf(link)}" data-k="${esc(link)}">${esc(labelOf(link))}</a>${via ? `<span class="via">${esc(via)}</span>` : ''}</li>`;
+  const row = (link, via) => `<li><a class="wl" href="${hrefOf(link)}" data-k="${esc(link)}">${esc(labelOf(link))}</a>${catHtml(noteOf(link))}${via ? `<span class="via">${esc(via)}</span>` : ''}</li>`;
   const viaOf = (k) => (k === String(n.i) ? '' : shortLabel(k));
   $('#links-meta').textContent = inc.length || out.length ? `←${inc.length} →${out.length}` : '';
   box.innerHTML = `
@@ -628,7 +633,7 @@ function renderPins() {
           <a class="pc-link" href="${hrefOf(k)}" title="${esc(citationOf(k))}">
             <span class="pm-frame">${esc(pinFrame(k))}</span>
             <span class="pm-card"><span class="pt-dot ${statusClass(n)}"></span>
-              <span class="pm-title">${esc(shortLabel(k))}</span><span class="pm-sub">${esc(contextOf(n))}</span></span>
+              <span class="pm-title">${esc(shortLabel(k))}</span><span class="pm-sub">${esc(contextOf(n))}</span>${catHtml(n, 'cat pm-cat')}</span>
           </a>
           <button class="act pm-x" type="button" data-act="pin" data-k="${esc(k)}" aria-pressed="true" title="Откачи" aria-label="Откачи">${ICON.x}</button>
           <button class="pc-toggle" type="button" data-act="toggle-pin" data-k="${esc(k)}" aria-expanded="${open}" title="Прикажи го текстот" aria-label="Прикажи го текстот"></button>
@@ -664,7 +669,7 @@ function setTreeRoot(k) {
 
 function treeLabel(k) {
   const n = noteOf(k);
-  return `<span class="tl-m">${esc(shortLabel(k))}</span><span class="tl-n">${esc(contextOf(n))}</span>`;
+  return `<span class="tl-m">${esc(shortLabel(k))}</span><span class="tl-n">${esc(contextOf(n))}</span>${catHtml(n)}`;
 }
 
 function renderTree() {
