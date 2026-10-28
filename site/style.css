@@ -87,6 +87,10 @@ svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width:
   transition: color 0.2s;
 }
 .brand:hover { color: var(--accent); }
+.wip {
+  flex: none; align-self: center; padding: 0.6mm 2.2mm 0.5mm; border: 1.5px solid var(--yellow); border-radius: 999px;
+  font-size: 2.7mm; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; line-height: 1.3; white-space: nowrap; color: var(--yellow);
+}
 
 .countries { display: flex; gap: 2mm; padding: 2mm 0 0 7mm; }
 .country {
@@ -724,7 +728,7 @@ a.st-bad, .row.st-bad a { color: var(--dim) !important; }
   :root { --top-h: 16mm; }
   .app { grid-template-columns: minmax(0, 1fr); }
   .topbar { grid-template-columns: auto minmax(0, 1fr) auto; padding: 0 3mm; gap: 2mm; }
-  .brand { display: none; }
+  .brand, .wip { display: none; }
   .search-pill { height: 11mm; padding: 0 2mm 0 3.5mm; }
   #search { font-size: 4mm; }
   .search-kbd { display: none; }
