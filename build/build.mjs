@@ -429,7 +429,7 @@ const json = (o) => JSON.stringify(o, (k, v) => (v instanceof Date ? v.toISOStri
 const index = {
   site: {
     title: config.title, metaSections: [...META_SECTIONS],
-    // The notes outside the themes, as the rail shows them: name, short label, group ("start" or "about").
+    // The notes outside the themes, as the rail shows them: name, short label, text, icon.
     rootNotes: (config.rootNotes || []).map((r) => ({ ...r, i: resolveNote(r.note, null)?.i ?? null })).filter((r) => r.i != null),
   },
   folders,

@@ -947,7 +947,7 @@ function actCard(ai) {
 let railCountry = countries[0];
 
 // The notes outside the themes. site.config.json → rootNotes names them and sorts them into
-// "start" (cards at the top of the rail and on the home page) and "about" (a button next to GitHub); any other note there goes to "about".
+// the cards at the top of the rail and on the home page, in the order listed; a note there that isn't listed is added after them.
 const ROOT_ICONS = {
   list: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6h11M9 12h11M9 18h11"/><circle cx="4.5" cy="6" r="1.4"/><circle cx="4.5" cy="12" r="1.4"/><circle cx="4.5" cy="18" r="1.4"/></svg>',
   flow: '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="2.5" y="3.5" width="7" height="5" rx="1.2"/><rect x="14.5" y="15.5" width="7" height="5" rx="1.2"/><path d="M6 8.5v5a2.5 2.5 0 0 0 2.5 2.5h6M12 13.5l2.5 2.5-2.5 2.5"/></svg>',
@@ -958,36 +958,17 @@ const START_ACCENTS = ['var(--red)', 'var(--yellow)', 'var(--teal)', 'var(--gree
 function rootNotesOf(country) {
   const cfg = (index.site.rootNotes || []).filter((r) => N[r.i]?.dir === country);
   const named = new Set(cfg.map((r) => r.i));
-  const start = cfg.filter((r) => r.group === 'start').map((r, k) => ({ ...r, accent: START_ACCENTS[k % START_ACCENTS.length] }));
-  const about = [
-    ...cfg.filter((r) => r.group !== 'start' || r.button), // a start card can also be a button next to GitHub
-    ...N.filter((n) => n.dir === country && !named.has(n.i)).sort((a, b) => naturally(a.base, b.base)).map((n) => ({ i: n.i, label: n.label })),
-  ];
-  return { start, about };
-}
-/** A label in two lines, split near the middle at a space: "Методологија и" / "ограничувања". */
-function stackLabel(label) {
-  const words = label.trim().split(/\s+/);
-  let best = 1;
-  let gap = Infinity;
-  for (let i = 1; i < words.length; i++) {
-    const d = Math.abs(words.slice(0, i).join(' ').length - words.slice(i).join(' ').length);
-    if (d <= gap) { gap = d; best = i; }
-  }
-  return [words.slice(0, best), words.slice(best)].filter((l) => l.length).map((l) => `<span>${esc(l.join(' '))}</span>`).join('');
+  const rest = N.filter((n) => n.dir === country && !named.has(n.i)).sort((a, b) => naturally(a.base, b.base)).map((n) => ({ i: n.i, label: n.label }));
+  return { start: [...cfg, ...rest].map((r, k) => ({ ...r, accent: START_ACCENTS[k % START_ACCENTS.length] })) };
 }
 function renderRail() {
   $('#countries').innerHTML = countries.map((c) => `<a class="country${c === railCountry ? ' is-active' : ''}" href="#/" data-country="${esc(c)}">${esc(c)}</a>`).join('');
-  const { start, about } = rootNotesOf(railCountry);
+  const { start } = rootNotesOf(railCountry);
   $('#rail-start').innerHTML = start.length ? `<p class="rail-label">Почни тука</p>
     <ul class="act-list start-list">${start.map((r) => `<li class="pt" data-root-i="${r.i}" style="--accent:${r.accent}"><a href="${hrefOf(r.i)}">
       <span class="pt-frame pt-icon">${ROOT_ICONS[r.icon] || ROOT_ICONS.note}</span>
       <span class="pt-card"><span class="pt-title">${esc(r.label)}</span>${r.text ? `<span class="pt-text">${esc(r.text)}</span>` : ''}</span>
     </a></li>`).join('')}</ul>` : '';
-  // The notes about the vault (Методологија и ограничувања): a narrow button by GitHub, its words stacked.
-  // On a phone the top bar has no room for it, so it is also a link at the bottom of the menu.
-  $('#top-notes').innerHTML = about.map((r) => `<a class="btn-stack" href="${hrefOf(r.i)}" data-i="${r.i}" title="${esc(r.label)}">${stackLabel(r.label)}</a>`).join('');
-  $('#rail-notes').innerHTML = about.map((r) => `<a class="rail-note" href="${hrefOf(r.i)}" data-i="${r.i}">${esc(r.label)}</a>`).join('');
   $('#themes').innerHTML = themes.filter((t) => t.country === railCountry).map((t) => `
     <li class="theme" data-theme="${esc(t.dir)}" style="--accent:${t.accent}">
       <button class="th-head" type="button" data-theme-head="${esc(t.dir)}" aria-expanded="false">
@@ -1021,7 +1002,6 @@ function markRail() {
   }
   for (const el of $$('#themes .th-overview')) el.classList.toggle('is-current', n != null && Number(el.dataset.i) === n.i);
   for (const el of $$('#themes .pt.is-current')) { el.classList.remove('is-current'); $('.pt-here', el).textContent = ''; }
-  for (const el of $$('#top-notes a, #rail-notes a')) el.classList.toggle('is-current', n != null && Number(el.dataset.i) === n.i);
   for (const el of $$('#rail-start .pt')) el.classList.toggle('is-current', n != null && Number(el.dataset.rootI) === n.i);
   if (!n || n.act < 0) return;
   const card = $(`#themes .pt[data-act-i="${n.act}"]`);
