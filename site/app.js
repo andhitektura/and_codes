@@ -239,17 +239,20 @@ function parseHash() {
   return { i: byU.has(u) ? byU.get(u) : null, anchor };
 }
 
+let keepMenu = false; // choosing an act on a phone leaves the menu open, so its outline can be used
 async function route() {
   closePopovers(0);
-  document.body.classList.remove('show-left', 'show-right');
+  if (!keepMenu) document.body.classList.remove('show-left');
+  document.body.classList.remove('show-right');
   const { i, anchor, home } = parseHash();
   if (home) {
     current = { i: null, anchor: '', home: true };
     renderHome();
+    syncMenu(null);
   } else if (i == null) {
     current = { i: null, anchor: '' };
     main.innerHTML = '<article class="note"><h1>Не е пронајдено</h1><p>Оваа белешка не постои или не е објавена.</p></article>';
-    $('#toc').innerHTML = '';
+    syncMenu(null);
   } else if (i !== current.i) {
     current = { i, anchor };
     main.innerHTML = '<div class="loading">Се вчитува…</div>';
@@ -345,7 +348,8 @@ async function renderNote(i) {
     }
   }
   fillEmbeds(main, 0);
-  renderToc(n, data);
+  syncMenu(n, data);
+  watchSections(n);
   document.title = `${n.label} — ${index.site.title}`;
 }
 
@@ -362,23 +366,26 @@ async function fillEmbeds(root, depth) {
   }
 }
 
-// ---------- right panel ----------
+// ---------- the act's outline, in the menu ----------
+// Choosing an act turns the menu into its outline: the act's name as the title with a back button, and below it the
+// headings (## > ### > ####) and членови as a collapsible tree along the line.
 
-function showTab(name) {
-  for (const b of $$('.tabs [data-tab]')) b.setAttribute('aria-selected', b.dataset.tab === name);
-  for (const p of $$('.tab-panel')) p.hidden = p.dataset.panel !== name;
-  local.set('tab', name);
-}
-$('.tabs').addEventListener('click', (e) => {
-  const b = e.target.closest('[data-tab]');
-  if (b) showTab(b.dataset.tab);
-});
-
-// The table of contents is the act's outline as a collapsible tree, like Obsidian's: ## > ### > #### > членови.
+let detailKey = null;   // which outline the menu shows: "act:12" or "note:812"
+let detailOwner = null;
 let tocObserver;
-function outlineOf(n, data) {
-  if (n.act >= 0) return acts[n.act].o;
-  return data.sec.filter((s) => s.a).map((s) => [s.v || (s.k === 'member' ? 7 : 2), s.l, s.a]);
+
+function ownerOfAct(ai) {
+  const a = acts[ai];
+  const t = themeOf(N[a.m]);
+  const group = N[a.m].dir.split('/')[2];
+  return { key: `act:${ai}`, title: a.t, kicker: [a.c, group && group.toLowerCase()].filter(Boolean).join(' · '), href: hrefOf(a.m), items: a.o, act: ai, accent: t ? t.accent : 'var(--ink)' };
+}
+/** A page that is not an act has an outline only when it has a few headings of its own. */
+function ownerOfNote(n, data) {
+  const items = data.sec.filter((x) => x.a && x.k !== 'footnotes').map((x) => [x.v || (x.k === 'member' ? 7 : 2), x.l, x.a]);
+  if (items.length < 3) return null;
+  const t = themeOf(n);
+  return { key: `note:${n.i}`, title: n.label, kicker: '', href: hrefOf(n.i), items, act: -1, owner: n.i, accent: t ? t.accent : 'var(--ink)' };
 }
 function tocTree(items) {
   const root = { level: 0, children: [] };
@@ -392,64 +399,144 @@ function tocTree(items) {
   }
   return root.children;
 }
-function renderToc(n, data) {
-  tocObserver?.disconnect();
-  const box = $('#toc');
-  const a = actOf(n);
-  const onMaster = n.kind === 'master';
-  const items = outlineOf(n, data);
-  if (!items.length) { box.innerHTML = '<p class="hint">Оваа белешка нема наслови ни членови.</p>'; return; }
+function renderDetail(o) {
+  detailKey = o.key;
+  detailOwner = o;
+  $('#view-act').style.setProperty('--accent', o.accent);
+  $('#act-title').innerHTML = `${o.kicker ? `<span class="act-kicker">${esc(o.kicker)}</span>` : ''}<a class="act-name" href="${o.href}" title="${esc(o.title)}">${esc(o.title)}</a>`;
+  $('#act-tools').innerHTML = `<button class="btn ghost" type="button" data-open="1">отвори сè</button><button class="btn ghost" type="button" data-open="0">собери</button>`;
+  const ownerHref = (anchor) => (o.act >= 0 ? hrefOf(`${acts[o.act].m}#${anchor}`) : hrefOf(`${o.owner}#${anchor}`));
   const linkOf = (node) => {
     if (node.unit != null) {
       const u = N[node.unit];
       const anchor = unitPos.get(node.unit)?.anchor;
-      const href = onMaster && anchor ? hrefOf(`${n.i}#${anchor}`) : hrefOf(node.unit);
-      return `<a class="${statusClass(u)}" href="${href}" data-k="${node.unit}" data-toc="${node.unit}" ${anchor ? `data-anchor="${esc(anchor)}"` : ''}>${esc(u.label)}</a>`;
+      return `<a class="${statusClass(u)}" href="${hrefOf(node.unit)}" data-toc="${node.unit}" ${anchor ? `data-anchor="${esc(anchor)}"` : ''}>${esc(u.label)}</a>`;
     }
-    const owner = a ? a.m : n.i;
-    return `<a class="toc-h" href="${hrefOf(`${owner}#${node.anchor}`)}" data-anchor="${esc(node.anchor)}">${esc(node.label)}</a>`;
+    return `<a class="toc-h" href="${ownerHref(node.anchor)}" data-anchor="${esc(node.anchor)}">${esc(node.label)}</a>`;
   };
-  const html = (nodes) => `<ul>${nodes.map((node) => `
-    <li class="${node.children.length ? 'has-kids collapsed' : ''} ${node.unit != null ? 'is-unit' : `lvl-${Math.min(node.level, 6)}`}">
-      <div class="orow">${node.children.length ? '<button class="tw" data-act="toc-toggle" aria-label="Отвори">▾</button>' : '<span class="tw-space"></span>'}${linkOf(node)}</div>
-      ${node.children.length ? html(node.children) : ''}
-    </li>`).join('')}</ul>`;
-  box.innerHTML = `<div class="panel-head toc-head">
-      ${a ? `<a class="toc-act" href="${hrefOf(a.m)}">${esc(a.c)} · ${esc(a.t)}</a>` : ''}
-      <span class="toc-tools"><button class="btn ghost" data-act="toc-all" data-open="1">отвори сè</button><button class="btn ghost" data-act="toc-all" data-open="0">собери</button></span>
-    </div><div class="otree">${html(tocTree(items))}</div>`;
+  const html = (nodes) => `<ul>${nodes.map((node) => {
+    const kids = node.children.length;
+    return `<li class="${kids ? 'has-kids collapsed' : ''} ${node.unit != null ? 'is-unit' : `lvl-${Math.min(node.level, 6)}`}">
+      <div class="orow"><span class="dash" aria-hidden="true"></span>${linkOf(node)}${kids ? '<button class="ot-chev" type="button" data-act="toc-toggle" aria-label="Отвори"></button>' : ''}</div>
+      ${kids ? html(node.children) : ''}</li>`;
+  }).join('')}</ul>`;
+  $('#otree').innerHTML = html(tocTree(o.items));
   // The top level stays open, so the act's parts are visible at once.
-  $$('.otree > ul > li.has-kids', box).forEach((li) => li.classList.remove('collapsed'));
-  // On a page with its own sections, the entry in view follows the scroll.
-  if (!onMaster && n.kind !== 'note') return;
+  $$('#otree > ul > li.has-kids').forEach((li) => li.classList.remove('collapsed'));
+}
+function setRailMode(mode) {
+  const detail = mode === 'detail';
+  const themesView = $('#view-themes');
+  const actView = $('#view-act');
+  if (actView.hidden !== detail) return;
+  themesView.hidden = detail;
+  actView.hidden = !detail;
+  const shown = detail ? actView : themesView;
+  shown.classList.remove('view-in');
+  void shown.offsetWidth;
+  shown.classList.add('view-in');
+  $('#left').scrollTop = 0;
+  if (detail) markTocCurrent(); else markRail();
+}
+/** Follows the page: an act, or a page with headings, shows its outline; anything else shows the themes. */
+function syncMenu(n, data) {
+  const owner = n ? (n.act >= 0 ? ownerOfAct(n.act) : ownerOfNote(n, data)) : null;
+  if (!owner) { detailKey = null; detailOwner = null; setRailMode('themes'); return; }
+  // pressing back keeps the themes showing while you read on in the same act
+  if (owner.key !== detailKey) { renderDetail(owner); setRailMode('detail'); }
+}
+/** On a page with its own sections, the entry in view follows the scroll. */
+function watchSections(n) {
+  tocObserver?.disconnect();
+  tocObserver = null;
+  if (n.kind !== 'master' && n.kind !== 'note') return;
   tocObserver = new IntersectionObserver((entries) => {
-    for (const en of entries) if (en.isIntersecting) markToc($(`#toc a[data-anchor="${CSS.escape(en.target.id.slice(2))}"]`), false);
+    for (const en of entries) if (en.isIntersecting) markToc($(`#otree a[data-anchor="${CSS.escape(en.target.id.slice(2))}"]`), false);
   }, { root: main, rootMargin: '0px 0px -70% 0px' });
   $$('section.sec[id]', main).forEach((sec) => tocObserver.observe(sec));
 }
-/** Highlights a table-of-contents entry and opens the branches above it. */
+/** Highlights an outline entry, opens the branches above it and marks its part of the line with the +. */
 function markToc(link, center = true) {
+  $$('#otree a.active').forEach((x) => x.classList.remove('active'));
+  $$('#otree li.has-current').forEach((x) => x.classList.remove('has-current'));
   if (!link) return;
-  $$('#toc a.active').forEach((x) => x.classList.remove('active'));
   link.classList.add('active');
-  for (let li = link.closest('li'); li; li = li.parentElement.closest('li')) if (li !== link.closest('li')) li.classList.remove('collapsed');
-  link.scrollIntoView({ block: center ? 'center' : 'nearest' });
+  link.closest('#otree > ul > li')?.classList.add('has-current');
+  const own = link.closest('li');
+  for (let li = own.parentElement.closest('li'); li; li = li.parentElement.closest('li')) li.classList.remove('collapsed');
+  if (!$('#view-act').hidden) link.scrollIntoView({ block: center ? 'center' : 'nearest' });
 }
 function markTocCurrent() {
-  if (current.i == null) return;
-  if (current.anchor) markToc($(`#toc a[data-anchor="${CSS.escape(current.anchor)}"]`));
-  else markToc($(`#toc a[data-toc="${current.i}"]`));
+  if (current.i == null || !detailOwner) return;
+  markToc(current.anchor ? $(`#otree a[data-anchor="${CSS.escape(current.anchor)}"]`) : $(`#otree a[data-toc="${current.i}"]`));
 }
-$('#toc').addEventListener('click', (e) => {
+$('#otree').addEventListener('click', (e) => {
   const t = e.target.closest('[data-act="toc-toggle"]');
   if (t) { t.closest('li').classList.toggle('collapsed'); return; }
-  const all = e.target.closest('[data-act="toc-all"]');
-  if (all) $$('#toc li.has-kids').forEach((li) => li.classList.toggle('collapsed', all.dataset.open !== '1'));
+  // reading the act's own text: a член in the outline scrolls to it instead of leaving the page
+  const a = e.target.closest('a[data-toc]');
+  if (a && a.dataset.anchor && detailOwner?.act >= 0 && current.i === acts[detailOwner.act].m) {
+    e.preventDefault();
+    location.hash = hrefOf(`${current.i}#${a.dataset.anchor}`);
+  }
 });
+$('#act-tools').addEventListener('click', (e) => {
+  const b = e.target.closest('[data-open]');
+  if (b) $$('#otree li.has-kids').forEach((li) => li.classList.toggle('collapsed', b.dataset.open !== '1'));
+});
+$('#back-btn').addEventListener('click', () => {
+  const t = themeOf(current.i != null ? N[current.i] : null);
+  const el = t && $(`#themes .theme[data-theme="${CSS.escape(t.dir)}"]`);
+  if (el) setThemeOpen(el, true);
+  setRailMode('themes');
+});
+
+// ---------- the right panels: stacked, and the one you point at opens ----------
+
+const panelEls = $$('.panel');
+let openName = local.get('panel');
+if (!panelEls.some((p) => p.dataset.panel === openName)) openName = 'links';
+let panelLock = 0;    // while a panel is moving, hovering another one waits
+let panelTimer = null;
+let pointer = null;
+function applyPanels() {
+  for (const p of panelEls) {
+    const on = p.dataset.panel === openName;
+    p.classList.toggle('is-open', on);
+    $('.pn-head', p).setAttribute('aria-expanded', on);
+    $('.pn-body', p).inert = !on;
+  }
+}
+function openPanel(name) {
+  if (name === openName) return;
+  openName = name;
+  local.set('panel', name);
+  panelLock = performance.now() + 520;
+  applyPanels();
+  setTimeout(settlePanels, 560);
+}
+/** Opens the panel under the pointer, once the last one has finished moving. */
+function settlePanels() {
+  if (!pointer || performance.now() < panelLock) return;
+  const name = document.elementFromPoint(pointer.x, pointer.y)?.closest('.panel')?.dataset.panel;
+  if (name && name !== openName) openPanel(name);
+}
+for (const p of panelEls) {
+  p.addEventListener('pointerenter', (e) => {
+    if (e.pointerType === 'touch') return;
+    clearTimeout(panelTimer);
+    if (p.dataset.panel !== openName) panelTimer = setTimeout(settlePanels, 150);
+  });
+  p.addEventListener('pointerleave', () => clearTimeout(panelTimer));
+  p.addEventListener('focusin', () => openPanel(p.dataset.panel));
+  $('.pn-head', p).addEventListener('click', () => openPanel(p.dataset.panel));
+}
+$('#right').addEventListener('pointermove', (e) => { pointer = { x: e.clientX, y: e.clientY }; }, { passive: true });
+$('#right').addEventListener('pointerleave', () => { pointer = null; clearTimeout(panelTimer); });
 
 function renderLinks() {
   const box = $('#links');
-  if (current.i == null) { box.innerHTML = ''; return; }
+  if (current.i == null) { box.innerHTML = '<p class="hint">Отвори акт или член за да ги видиш неговите врски.</p>'; $('#links-meta').textContent = ''; return; }
   const n = N[current.i];
   const own = n.kind === 'master' && n.act >= 0 ? [String(n.i), ...actMembers[n.act].map(String)] : [String(n.i), ...(noteSections.get(String(n.i)) || [])];
   const ownSet = new Set(own);
@@ -462,6 +549,7 @@ function renderLinks() {
   }
   const row = (link, via) => `<li><a class="wl" href="${hrefOf(link)}" data-k="${esc(link)}">${esc(labelOf(link))}</a>${via ? `<span class="via">${esc(via)}</span>` : ''}</li>`;
   const viaOf = (k) => (k === String(n.i) ? '' : shortLabel(k));
+  $('#links-meta').textContent = inc.length || out.length ? `←${inc.length} →${out.length}` : '';
   box.innerHTML = `
     <h3>Упатено од <span class="count">${inc.length}</span></h3>
     ${inc.length ? `<ul class="link-list">${inc.sort((a, b) => byOrder(a[0], b[0])).map(([s, k]) => row(s, viaOf(k) && '→ ' + viaOf(k))).join('')}</ul>` : '<p class="hint">Ништо друго не упатува тука.</p>'}
@@ -472,7 +560,6 @@ function renderLinks() {
 // ---------- pins (session memory) ----------
 
 let pins = session.get('pins', []).map(fromStored).filter(Boolean);
-const collapsedPins = new Set(session.get('pinsCollapsed', []));
 const savePins = () => session.set('pins', pins.map(toStored));
 
 function togglePin(k) {
@@ -484,40 +571,72 @@ function togglePin(k) {
 }
 function syncPins() {
   for (const b of $$('[data-act="pin"]')) b.setAttribute('aria-pressed', pins.includes(b.dataset.k));
-  const badge = $('#pin-count');
-  badge.hidden = !pins.length;
-  badge.textContent = pins.length;
   renderPins();
+}
+/** What the small card's frame shows: the член's number, or the act's number. */
+function pinFrame(k) {
+  const n = noteOf(k);
+  const { anchor } = split(k);
+  const m = (anchor ? anchorLabel(anchor) : n.label).match(/^(?:Член|Точка|Амандман|Прилог)\s+(.+)$/i);
+  if (m) return m[1];
+  const a = actOf(n);
+  return a ? a.c.split('-').pop() : '·';
+}
+
+const openPins = new Set(session.get('pinsOpen', [])); // cards that are unfolded, by file name; the rest stay small
+
+function pinBodyHtml(k) {
+  return `<div class="pc-acts">${actionButtons(k)}</div><div class="pc-text"><p class="hint">Се вчитува…</p></div>`;
+}
+async function fillPinBody(card) {
+  const k = card.dataset.k;
+  const { secs, more } = previewSections(k, await sectionsOf(k));
+  const box = $('.pc-text', card);
+  if (box) box.innerHTML = normHtml(secs) + (more ? `<p class="hint"><a href="${hrefOf(k)}">Целиот акт →</a></p>` : '');
+}
+function togglePinOpen(k) {
+  const card = $(`.pin-card[data-k="${CSS.escape(k)}"]`);
+  if (!card) return;
+  const open = card.classList.toggle('open');
+  $('.pc-toggle', card).setAttribute('aria-expanded', open);
+  if (open) {
+    openPins.add(toStored(k));
+    $('.pc-body', card).innerHTML = pinBodyHtml(k);
+    fillPinBody(card);
+  } else openPins.delete(toStored(k));
+  session.set('pinsOpen', [...openPins]);
 }
 
 function renderPins() {
   const box = $('#pins');
+  const meta = $('#pins-meta');
+  meta.textContent = pins.length || '';
+  meta.classList.toggle('pn-count', pins.length > 0);
   if (!pins.length) {
-    box.innerHTML = `<p class="hint">Закачи членови со ${ICON.pin} за да ги имаш на едно место додека работиш. Се чуваат додека е отворен овој таб.</p>`;
+    box.innerHTML = `<p class="hint">Закачи членови со ${ICON.pin} за да ги имаш на едно место додека работиш. Стрелката ја отвора картичката, а кликот врз неа го отвора целиот член. Се чуваат додека е отворен овој таб.</p>`;
     return;
   }
   box.innerHTML = `<div class="panel-head">
       <button class="btn" data-act="copy-pins">${ICON.copy} Копирај сè</button>
       <button class="btn ghost" data-act="clear-pins">Исчисти</button>
     </div>
-    <ol class="pin-list">${pins.map((k, i) => `
-      <li class="pin-card${collapsedPins.has(toStored(k)) ? ' collapsed' : ''}" data-k="${esc(k)}">
-        <div class="pc-head">
-          <button class="tw" data-act="collapse-pin" data-k="${esc(k)}" aria-label="Собери">▾</button>
-          <a class="wl" href="${hrefOf(k)}" data-k="${esc(k)}" title="${esc(citationOf(k))}">${treeLabel(k)}</a>
-          <button class="act" data-act="move-pin" data-dir="-1" data-k="${esc(k)}" title="Нагоре" ${i === 0 ? 'disabled' : ''}>↑</button>
-          <button class="act" data-act="tree" data-k="${esc(k)}" title="Истражи врски">${ICON.tree}</button>
-          <button class="act" data-act="pin" data-k="${esc(k)}" aria-pressed="true" title="Откачи">${ICON.x}</button>
+    <ol class="pin-list">${pins.map((k) => {
+      const n = noteOf(k);
+      const open = openPins.has(toStored(k));
+      return `<li class="pin-card${open ? ' open' : ''}" data-k="${esc(k)}">
+        <div class="pc-row">
+          <a class="pc-link" href="${hrefOf(k)}" title="${esc(citationOf(k))}">
+            <span class="pm-frame">${esc(pinFrame(k))}</span>
+            <span class="pm-card"><span class="pt-dot ${statusClass(n)}"></span>
+              <span class="pm-title">${esc(shortLabel(k))}</span><span class="pm-sub">${esc(contextOf(n))}</span></span>
+          </a>
+          <button class="act pm-x" type="button" data-act="pin" data-k="${esc(k)}" aria-pressed="true" title="Откачи" aria-label="Откачи">${ICON.x}</button>
+          <button class="pc-toggle" type="button" data-act="toggle-pin" data-k="${esc(k)}" aria-expanded="${open}" title="Прикажи го текстот" aria-label="Прикажи го текстот"></button>
         </div>
-        <div class="pc-body"></div>
-      </li>`).join('')}</ol>`;
-  for (const card of $$('.pin-card', box)) {
-    const k = card.dataset.k;
-    sectionsOf(k).then((secs) => {
-      const { secs: shown, more } = previewSections(k, secs);
-      card.querySelector('.pc-body').innerHTML = normHtml(shown) + (more ? `<p class="hint"><a href="${hrefOf(k)}">Целиот акт →</a></p>` : '');
-    });
-  }
+        <div class="pc-body">${open ? pinBodyHtml(k) : ''}</div>
+      </li>`;
+    }).join('')}</ol>`;
+  for (const card of $$('.pin-card.open', box)) fillPinBody(card);
 }
 
 async function copyPins() {
@@ -539,7 +658,7 @@ function setTreeRoot(k) {
   treeRoot = String(k);
   session.set('treeRoot', toStored(treeRoot));
   renderTree();
-  showTab('tree');
+  openPanel('tree');
   document.body.classList.add('show-right');
 }
 
@@ -550,6 +669,7 @@ function treeLabel(k) {
 
 function renderTree() {
   const box = $('#tree');
+  $('#tree-meta').textContent = treeRoot ? labelOf(treeRoot) : '';
   if (!treeRoot) {
     box.innerHTML = `<p class="hint">Кликни на ${ICON.tree} кај член за да ги следиш неговите врски: кон што упатува (→) и што упатува кон него (←). Секое ниво се отвора со клик. Кај цел акт, врските се собрани по акти.</p>`;
     return;
@@ -822,7 +942,7 @@ function actCard(ai) {
 let railCountry = countries[0];
 
 // The notes outside the themes. site.config.json → rootNotes names them and sorts them into
-// "start" (cards at the top of the rail) and "about" (links at the bottom); any other note there goes to "about".
+// "start" (cards at the top of the rail and on the home page) and "about" (a button next to GitHub); any other note there goes to "about".
 const ROOT_ICONS = {
   list: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6h11M9 12h11M9 18h11"/><circle cx="4.5" cy="6" r="1.4"/><circle cx="4.5" cy="12" r="1.4"/><circle cx="4.5" cy="18" r="1.4"/></svg>',
   flow: '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="2.5" y="3.5" width="7" height="5" rx="1.2"/><rect x="14.5" y="15.5" width="7" height="5" rx="1.2"/><path d="M6 8.5v5a2.5 2.5 0 0 0 2.5 2.5h6M12 13.5l2.5 2.5-2.5 2.5"/></svg>',
@@ -839,6 +959,17 @@ function rootNotesOf(country) {
   ];
   return { start, about };
 }
+/** A label in two lines, split near the middle at a space: "Методологија и" / "ограничувања". */
+function stackLabel(label) {
+  const words = label.trim().split(/\s+/);
+  let best = 1;
+  let gap = Infinity;
+  for (let i = 1; i < words.length; i++) {
+    const d = Math.abs(words.slice(0, i).join(' ').length - words.slice(i).join(' ').length);
+    if (d <= gap) { gap = d; best = i; }
+  }
+  return [words.slice(0, best), words.slice(best)].filter((l) => l.length).map((l) => `<span>${esc(l.join(' '))}</span>`).join('');
+}
 function renderRail() {
   $('#countries').innerHTML = countries.map((c) => `<a class="country${c === railCountry ? ' is-active' : ''}" href="#/" data-country="${esc(c)}">${esc(c)}</a>`).join('');
   const { start, about } = rootNotesOf(railCountry);
@@ -847,8 +978,10 @@ function renderRail() {
       <span class="pt-frame pt-icon">${ROOT_ICONS[r.icon] || ROOT_ICONS.note}</span>
       <span class="pt-card"><span class="pt-title">${esc(r.label)}</span>${r.text ? `<span class="pt-text">${esc(r.text)}</span>` : ''}</span>
     </a></li>`).join('')}</ul>` : '';
-  $('#rail-about').innerHTML = about.length ? `<p class="rail-label">За базата</p>
-    <ul class="about-list">${about.map((r) => `<li><a href="${hrefOf(r.i)}" data-i="${r.i}">${esc(r.label)}</a></li>`).join('')}</ul>` : '';
+  // The notes about the vault (Методологија и ограничувања): a narrow button by GitHub, its words stacked.
+  // On a phone the top bar has no room for it, so it is also a link at the bottom of the menu.
+  $('#top-notes').innerHTML = about.map((r) => `<a class="btn-stack" href="${hrefOf(r.i)}" data-i="${r.i}" title="${esc(r.label)}">${stackLabel(r.label)}</a>`).join('');
+  $('#rail-notes').innerHTML = about.map((r) => `<a class="rail-note" href="${hrefOf(r.i)}" data-i="${r.i}">${esc(r.label)}</a>`).join('');
   $('#themes').innerHTML = themes.filter((t) => t.country === railCountry).map((t) => `
     <li class="theme" data-theme="${esc(t.dir)}" style="--accent:${t.accent}">
       <button class="th-head" type="button" data-theme-head="${esc(t.dir)}" aria-expanded="false">
@@ -882,7 +1015,7 @@ function markRail() {
   }
   for (const el of $$('#themes .th-overview')) el.classList.toggle('is-current', n != null && Number(el.dataset.i) === n.i);
   for (const el of $$('#themes .pt.is-current')) { el.classList.remove('is-current'); $('.pt-here', el).textContent = ''; }
-  for (const el of $$('#rail-about a')) el.classList.toggle('is-current', n != null && Number(el.dataset.i) === n.i);
+  for (const el of $$('#top-notes a, #rail-notes a')) el.classList.toggle('is-current', n != null && Number(el.dataset.i) === n.i);
   for (const el of $$('#rail-start .pt')) el.classList.toggle('is-current', n != null && Number(el.dataset.rootI) === n.i);
   if (!n || n.act < 0) return;
   const card = $(`#themes .pt[data-act-i="${n.act}"]`);
@@ -895,7 +1028,15 @@ function markRail() {
 $('#themes').addEventListener('click', (e) => {
   // A theme's name opens and closes its list of acts; its overview page is the first entry inside.
   const head = e.target.closest('[data-theme-head]');
-  if (head) setThemeOpen(head.parentElement, !head.parentElement.classList.contains('is-open'));
+  if (head) { setThemeOpen(head.parentElement, !head.parentElement.classList.contains('is-open')); return; }
+  // Choosing an act turns the menu into its outline.
+  const card = e.target.closest('.pt[data-act-i] a');
+  if (card) {
+    keepMenu = true;
+    setTimeout(() => { keepMenu = false; }, 800);
+    renderDetail(ownerOfAct(Number(card.closest('.pt').dataset.actI)));
+    setRailMode('detail');
+  }
 });
 $('#countries').addEventListener('click', (e) => {
   const c = e.target.closest('[data-country]');
@@ -910,7 +1051,7 @@ $('#countries').addEventListener('click', (e) => {
 // ---------- home ----------
 
 function renderHome() {
-  const { start, about } = rootNotesOf(railCountry);
+  const { start } = rootNotesOf(railCountry);
   const list = themes.filter((t) => t.country === railCountry);
   const totalActs = list.reduce((s, t) => s + t.acts, 0);
   const totalUnits = list.reduce((s, t) => s + t.units, 0);
@@ -923,7 +1064,6 @@ function renderHome() {
         <span class="tile-card"><span class="tile-dot"></span><span class="tile-title">${esc(r.label)}</span>${r.text ? `<span class="tile-text">${esc(r.text)}</span>` : ''}</span>
       </a>`).join('')}
     </div>
-    ${about.length ? `<p class="home-about">За базата: ${about.map((r) => `<a href="${hrefOf(r.i)}">${esc(r.label)}</a>`).join(' · ')}</p>` : ''}
     <p class="rail-label home-themes">Теми</p>
     <div class="tiles">${list.map((t) => `
       <a class="tile" href="${t.moc != null ? hrefOf(t.moc) : '#/'}" style="--accent:${t.accent}">
@@ -933,7 +1073,6 @@ function renderHome() {
       </a>`).join('')}
     </div>
   </div>`;
-  $('#toc').innerHTML = '<p class="hint">Отвори акт или член за да ја видиш неговата содржина.</p>';
   document.title = index.site.title;
 }
 
@@ -1059,23 +1198,8 @@ document.addEventListener('click', async (e) => {
     case 'copy-tree': await copyText(treeAsText()); toast('Дрвото е копирано'); break;
     case 'clear-tree': treeRoot = null; session.set('treeRoot', ''); renderTree(); break;
     case 'copy-pins': await copyPins(); break;
-    case 'clear-pins': pins = []; savePins(); syncPins(); break;
-    case 'collapse-pin': {
-      const card = b.closest('.pin-card');
-      card.classList.toggle('collapsed');
-      if (card.classList.contains('collapsed')) collapsedPins.add(toStored(k)); else collapsedPins.delete(toStored(k));
-      session.set('pinsCollapsed', [...collapsedPins]);
-      break;
-    }
-    case 'move-pin': {
-      const i = pins.indexOf(k);
-      const j = i + Number(b.dataset.dir);
-      if (i < 0 || j < 0 || j >= pins.length) break;
-      [pins[i], pins[j]] = [pins[j], pins[i]];
-      savePins();
-      renderPins();
-      break;
-    }
+    case 'clear-pins': pins = []; savePins(); syncPins(); closePopovers(0); break;
+    case 'toggle-pin': togglePinOpen(k); break;
   }
 });
 
@@ -1103,7 +1227,7 @@ document.addEventListener('click', (e) => {
   if (!legend.hidden && !e.target.closest('#legend, #legend-btn')) setLegend(false);
 });
 document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !legend.hidden) setLegend(false); });
-showTab(local.get('tab') || 'toc');
+applyPanels();
 syncPins();
 renderTree();
 window.addEventListener('hashchange', route);
