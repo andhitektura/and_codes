@@ -74,8 +74,6 @@ svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width:
 .rail {
   position: relative;
   overflow-y: auto;
-  scrollbar-width: thin;
-  scrollbar-color: var(--line) transparent;
   padding: 0 4mm 0 0;
 }
 .brand {
@@ -560,7 +558,6 @@ pre code { background: none; padding: 0; }
 .panel.is-open .pn-head, .pn-head:hover { color: var(--ink); }
 .pn-body {
   flex: 1; min-height: 0; overflow: auto; padding: 1mm 3mm 4mm;
-  scrollbar-width: thin; scrollbar-color: var(--line) transparent;
   opacity: 0; transition: opacity 0.15s;
 }
 .panel.is-open .pn-body { opacity: 1; transition: opacity 0.3s 0.25s; }
@@ -849,7 +846,7 @@ a.st-bad, .row.st-bad a { color: var(--dim) !important; }
 .otree ul { list-style: none; margin: 0; padding: 0; }
 .otree li.collapsed > ul { display: none; }
 /* the first level hangs from the line: a dash for each part, the + at the one you are in */
-.otree > ul > li > .orow { display: grid; grid-template-columns: calc(var(--line-x) - 4mm) 8mm minmax(0, 1fr) 7mm; align-items: start; min-height: 9mm; }
+.otree > ul > li > .orow { display: grid; grid-template-columns: calc(var(--line-x) - 4mm) 8mm minmax(0, 1fr) 7mm; column-gap: 0; align-items: start; min-height: 9mm; }
 .orow { display: flex; align-items: flex-start; gap: 0.5mm; }
 .orow .dash { display: none; }
 .otree > ul > li > .orow .dash {
@@ -875,7 +872,15 @@ a.st-bad, .row.st-bad a { color: var(--dim) !important; }
 .orow > a:hover { background: var(--bg-3); color: var(--ink); }
 /* the current topic: bright and bold on a tint of the section's colour, as on the studio's menu */
 .orow > a.active { background: color-mix(in srgb, var(--accent) 22%, transparent); color: var(--ink); font-weight: 700; }
-.orow > a.active::before { content: '+ '; color: var(--accent); }
+.orow > a { position: relative; }
+.orow > a.active::before {
+  content: ''; position: absolute; left: calc(-2mm - 0.75px); top: 3.3mm; width: 3.2mm; height: 3.2mm; translate: -50% -50%;
+  background:
+    linear-gradient(var(--accent), var(--accent)) center / 0.8mm 2.6mm no-repeat,
+    linear-gradient(var(--accent), var(--accent)) center / 2.6mm 0.8mm no-repeat,
+    var(--bg);
+}
+.otree > ul > li > .orow > a.active::before { display: none; } /* a top-level part already has its + on the line */
 .ot-chev { position: relative; flex: none; width: 6mm; height: 6mm; margin-top: 1.2mm; padding: 0; border: 0; background: none; cursor: pointer; }
 .otree > ul > li > .orow > .ot-chev { grid-column: 4; justify-self: center; margin-top: 2.2mm; }
 .ot-chev::before {
@@ -902,3 +907,23 @@ a.st-bad, .row.st-bad a { color: var(--dim) !important; }
   .top-notes { display: none; }
   .rail-notes { display: block; }
 }
+
+/* Scrollbars: the menu's line with a dot that slides along it, a small dot at each end. Where the content around is dense
+   (the menu, the panels, popovers, code) the line and the dot are thinner. */
+:root { --sb: 4mm; --sb-dot: 2.6mm; --sb-line: 2px; --sb-ink: var(--ink); --sb-hot: var(--yellow); --sb-rule: #6f6f6f; }
+.rail, .pn-body, .pop-body, .pc-text, .search-results, .legend, pre { --sb: 2.8mm; --sb-dot: 1.6mm; --sb-line: 1.5px; }
+.pop { --sb-ink: #5b5b5b; --sb-hot: var(--card-ink); --sb-rule: rgb(35 35 35 / 0.35); }
+::-webkit-scrollbar { width: var(--sb); height: var(--sb); background: transparent; }
+::-webkit-scrollbar-corner { background: transparent; }
+::-webkit-scrollbar-track:vertical { background: linear-gradient(var(--sb-rule), var(--sb-rule)) center / var(--sb-line) 100% no-repeat; }
+::-webkit-scrollbar-track:horizontal { background: linear-gradient(var(--sb-rule), var(--sb-rule)) center / 100% var(--sb-line) no-repeat; }
+::-webkit-scrollbar-thumb {
+  border: 0; background: radial-gradient(circle closest-side, var(--sb-ink) 96%, transparent) center / var(--sb-dot) var(--sb-dot) no-repeat;
+}
+::-webkit-scrollbar-thumb:hover, ::-webkit-scrollbar-thumb:active {
+  background: radial-gradient(circle closest-side, var(--sb-hot) 96%, transparent) center / calc(var(--sb-dot) * 1.35) calc(var(--sb-dot) * 1.35) no-repeat;
+}
+::-webkit-scrollbar-button:single-button { display: block; background: radial-gradient(circle closest-side, var(--sb-rule) 96%, transparent) center / 1.3mm 1.3mm no-repeat; }
+::-webkit-scrollbar-button:vertical:single-button { width: var(--sb); height: 2.4mm; }
+::-webkit-scrollbar-button:horizontal:single-button { width: 2.4mm; height: var(--sb); }
+@supports not selector(::-webkit-scrollbar) { * { scrollbar-width: thin; scrollbar-color: var(--dim) transparent; } }
