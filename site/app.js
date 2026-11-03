@@ -323,6 +323,95 @@ function unitNav(n) {
   </nav>`;
 }
 
+// ---------- a theme's overview: the act tables become cards ----------
+// The overview pages (00 MOC — …) keep their acts in markdown tables: status, act, Службен весник, note. Read as a
+// table the long notes and the lists of gazette numbers swamp the act's name, so each row becomes the same numbered
+// frame and grey card the menu uses. The name, the code, the status and the span of the gazette numbers show; the
+// full note and the full list of numbers unfold from the arrow. Tables that are not lists of acts stay tables.
+
+const STATUS_DOT = { '✅': ['ok', 'важечки'], '⚠': ['warn', 'за проверка'], '⛔': ['bad', 'престанал да важи'] };
+const GAZETTE_LIST = /^\s*\d+\/\d{4}(?:\s*[,;]\s*\d+\/\d{4})*\s*\.?\s*$/;
+const statusOf = (text) => { const m = Object.keys(STATUS_DOT).find((e) => text.includes(e)); return m ? STATUS_DOT[m] : null; };
+const dotHtml = (st) => (st ? `<i class="st-dot st-${st[0]}" title="${esc(st[1])}"></i>` : '');
+const squash = (s) => s.replace(/\s+/g, ' ').trim();
+
+function actRow(cells, cols) {
+  const actCell = cells[cols.act];
+  // the link is normally on the act's name; a few rows carry it on the code ("ГЗ-06 ↪ ГК-22") instead
+  const link = actCell.querySelector('a.wl[data-k]') || (cols.code >= 0 ? cells[cols.code]?.querySelector('a.wl[data-k]') : null);
+  const text = (c) => squash(c?.textContent || '');
+  const title = text(actCell);
+  const st = cols.status >= 0 ? statusOf(text(cells[cols.status])) : null;
+  const act = link ? actOf(noteOf(link.dataset.k)) : null;
+  const code = act ? act.c : cols.code >= 0 ? text(cells[cols.code]).replace(/`/g, '') : '';
+  const [pre, ...rest] = code.split('-');
+  const frame = rest.length ? `<small>${esc(pre)}</small>${esc(rest.join('-'))}` : esc(code || '·');
+
+  // Cells that are not the status, the act or the code: the gazette numbers, or a note. A cell under "Службен весник"
+  // that is not a list of numbers is a note that slipped a column in the vault, so the content decides, not the header.
+  const fields = [];
+  let gazette = '';
+  cells.forEach((c, k) => {
+    if (k === cols.status || k === cols.act || (k === cols.code && text(c) === code) || !text(c)) return;
+    if (k === cols.gazette && GAZETTE_LIST.test(c.textContent)) { gazette = text(c); return; }
+    const label = k === cols.gazette ? 'Забелешка' : cols.heads[k] || 'Забелешка';
+    if (!fields.some((f) => f.text === text(c))) fields.push({ label, text: text(c), html: c.innerHTML });
+  });
+  // a note repeated under two headings, or contained in another, is shown once
+  for (let k = fields.length - 1; k >= 0; k--) {
+    if (fields.some((o, j) => j !== k && o.text.includes(fields[k].text) && (o.text.length > fields[k].text.length || j < k))) fields.splice(k, 1);
+  }
+  const nums = gazette.match(/\d+\/\d{4}/g) || [];
+  const span = nums.length > 1 ? `Сл.в. ${nums[0]} → ${nums[nums.length - 1]}` : nums.length ? `Сл.в. ${nums[0]}` : '';
+  const lead = fields[0]?.text || '';
+  const longTitle = title.length > 110;
+  const body = [
+    longTitle ? `<div class="ac-f"><span class="ac-k">Назив</span><div class="ac-v">${esc(title)}</div></div>` : '',
+    ...fields.map((f) => `<div class="ac-f"><span class="ac-k">${esc(f.label)}</span><div class="ac-v">${f.html}</div></div>`),
+    gazette ? `<div class="ac-f"><span class="ac-k">Службен весник · ${nums.length}</span><div class="ac-v ac-gz">${nums.map((x) => `<span>${esc(x)}</span>`).join('')}</div></div>` : '',
+  ].join('');
+
+  const head = `<span class="ac-frame">${frame}</span>
+    <span class="ac-card">${dotHtml(st)}<span class="ac-title">${esc(title)}</span>${span ? `<span class="ac-sub">${esc(span)}</span>` : ''}${lead ? `<span class="ac-sub ac-lead">${esc(lead)}</span>` : ''}</span>`;
+  const card = link
+    ? `<a class="ac-link wl" href="${esc(link.getAttribute('href'))}" data-k="${esc(link.dataset.k)}">${head}</a>`
+    : `<span class="ac-link">${head}</span>`;
+  return `<li class="ac${st ? ` st-${st[0]}` : ''}"><div class="ac-row">${card}${body ? '<button class="ac-toggle" type="button" aria-expanded="false" aria-label="Прикажи повеќе"></button>' : ''}</div>${body ? `<div class="ac-body" hidden>${body}</div>` : ''}</li>`;
+}
+
+function actCards(root) {
+  let any = false;
+  for (const table of $$('table', root)) {
+    const heads = $$('thead th', table).map((th) => squash(th.textContent));
+    const cols = { heads, act: heads.indexOf('Акт'), status: heads.indexOf('Статус'), code: heads.indexOf('Код'), gazette: heads.findIndex((h) => /весник/i.test(h)) };
+    const rows = $$('tbody tr', table).filter((tr) => tr.cells.length > cols.act);
+    const linked = (tr) => tr.cells[cols.act].querySelector('a.wl[data-k]') || (cols.code >= 0 && tr.cells[cols.code]?.querySelector('a.wl[data-k]'));
+    if (cols.act < 0 || !rows.length || !rows.some(linked)) continue;
+    table.outerHTML = `<ul class="ac-list">${rows.map((tr) => actRow([...tr.cells], cols)).join('')}</ul>`;
+    any = true;
+  }
+  if (!any) return;
+  // the legend's ✅ ⚠️ ⛔ become the dots the cards carry
+  for (const c of $$('.callout', root)) {
+    c.innerHTML = c.innerHTML.replace(/✅|⚠️?|⛔/g, (m) => dotHtml(statusOf(m)));
+  }
+  const first = $('.ac-list', root);
+  first.insertAdjacentHTML('beforebegin', '<div class="ac-tools"><button class="btn ghost" type="button" data-ac-open="1">отвори сè</button><button class="btn ghost" type="button" data-ac-open="0">собери</button></div>');
+}
+function setAc(li, open) {
+  li.classList.toggle('open', open);
+  const t = $('.ac-toggle', li);
+  if (t) t.setAttribute('aria-expanded', open);
+  const b = $('.ac-body', li);
+  if (b) b.hidden = !open;
+}
+main.addEventListener('click', (e) => {
+  const t = e.target.closest('.ac-toggle');
+  if (t) { const li = t.closest('.ac'); setAc(li, !li.classList.contains('open')); return; }
+  const all = e.target.closest('[data-ac-open]');
+  if (all) $$('.ac', main).forEach((li) => setAc(li, all.dataset.acOpen === '1'));
+});
+
 async function renderNote(i) {
   const n = N[i];
   const data = await noteData(i);
@@ -341,6 +430,7 @@ async function renderNote(i) {
     html += `<section class="${cls}" ${s.a ? `id="s-${esc(s.a)}"` : ''} ${k ? `data-k="${esc(k)}"` : ''}>${s.h}</section>`;
   }
   main.innerHTML = html + (n.kind === 'unit' ? unitNav(n) : '') + '</article>';
+  if (n.kind === 'moc') actCards(main);
   // Each член gets pin / tree / link actions on its heading line.
   for (const sec of $$('section.k-member[data-k]', main)) {
     const head = sec.firstElementChild;
