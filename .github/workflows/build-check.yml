@@ -1,0 +1,33 @@
+# Checks every pull request before it can be merged: the site must build, and AI-INSTRUCTIONS.md (which the build
+# regenerates) must be committed in its current form. Nothing is deployed here; pages.yml deploys after a merge.
+name: Build check
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: build-check-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - name: AI-INSTRUCTIONS.md is up to date
+        run: |
+          if ! git diff --quiet -- AI-INSTRUCTIONS.md; then
+            echo "::error file=AI-INSTRUCTIONS.md::The build changed AI-INSTRUCTIONS.md. Run npm run build locally and commit the file."
+            git diff --stat -- AI-INSTRUCTIONS.md
+            exit 1
+          fi

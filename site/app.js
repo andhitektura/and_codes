@@ -55,7 +55,20 @@ async function copyText(text) {
 // A key is a note index ("812"), or a note index and a heading anchor ("812#член-5")
 // for vaults that keep several членови in one note.
 
-const index = await fetch('data/index.json').then((r) => r.json());
+// The index is checked with the server on every load ("no-cache"), so a page opened after a deploy never pairs an
+// old index from the browser's cache with the new data.
+async function getJson(url, opts) {
+  const r = await fetch(url, opts);
+  if (!r.ok) { const e = new Error(`${r.status} ${url}`); e.status = r.status; throw e; }
+  return r.json();
+}
+let index;
+try {
+  index = await getJson('data/index.json', { cache: 'no-cache' });
+} catch (e) {
+  document.querySelector('#main').innerHTML = '<article class="note"><h1>Сајтот не се вчита</h1><p>Проверете ја врската и обидете се повторно.</p><p><button class="btn" type="button" onclick="location.reload()">Вчитај повторно</button></p></article>';
+  throw e;
+}
 const acts = index.acts;
 const KIND = { m: 'master', u: 'unit', a: 'archive', p: 'pzo', c: 'moc', n: 'note' };
 const N = index.notes.map(([d, base, label, kind, act, bundle, status], i) => ({
@@ -168,9 +181,24 @@ function related(k, adj) {
   return [...res].sort(byOrder);
 }
 
+// Bundles live in a folder named after the build (index.ver). After a new deploy that folder is gone: the 404 means
+// this page holds an outdated index, so it reloads once to pick up the new one rather than mix two builds.
 const bundleCache = new Map();
+function staleReload() {
+  if (session.get('reloadedFor', '') === index.ver) return false; // already tried: show the error instead of looping
+  session.set('reloadedFor', index.ver);
+  location.reload();
+  return true;
+}
 function loadBundle(id) {
-  if (!bundleCache.has(id)) bundleCache.set(id, fetch(`data/b/${id}.json`).then((r) => r.json()));
+  if (!bundleCache.has(id)) {
+    const p = getJson(`data/${index.ver}/b/${id}.json`).catch((e) => {
+      bundleCache.delete(id); // a failed fetch is tried again next time, not remembered
+      if (e.status === 404 && staleReload()) return new Promise(() => {}); // the page is reloading
+      throw e;
+    });
+    bundleCache.set(id, p);
+  }
   return bundleCache.get(id);
 }
 async function noteData(i) {
@@ -261,7 +289,16 @@ async function route() {
   } else if (i !== current.i) {
     current = { i, anchor };
     main.innerHTML = '<div class="loading">Се вчитува…</div>';
-    await renderNote(i);
+    try {
+      await renderNote(i);
+    } catch (e) {
+      if (current.i !== i) return;
+      console.error(e);
+      current = { i: null, anchor: '' };
+      main.innerHTML = '<article class="note"><h1>Белешката не се вчита</h1><p>Проверете ја врската и обидете се повторно.</p><p><button class="btn" type="button" onclick="location.reload()">Вчитај повторно</button></p></article>';
+      return;
+    }
+    if (current.i !== i) return; // another link was chosen while this one loaded
   }
   current.anchor = anchor;
   markRail();
@@ -455,7 +492,8 @@ async function fillEmbeds(root, depth) {
     const k = el.dataset.k;
     const link = `<a class="wl" href="${hrefOf(k)}" data-k="${esc(k)}">${esc(labelOf(k))}</a>`;
     if (depth > 2) { el.innerHTML = link; continue; }
-    const { secs } = previewSections(k, await sectionsOf(k, { norm: true }));
+    let secs = [];
+    try { ({ secs } = previewSections(k, await sectionsOf(k, { norm: true }))); } catch (e) { el.innerHTML = link; continue; }
     el.innerHTML = `<div class="embed-head">${link}</div>${sectionsHtml(secs)}`;
     fillEmbeds(el, depth + 1);
   }
@@ -685,8 +723,10 @@ function pinBodyHtml(k) {
 }
 async function fillPinBody(card) {
   const k = card.dataset.k;
-  const { secs, more } = previewSections(k, await sectionsOf(k));
   const box = $('.pc-text', card);
+  let secs;
+  let more;
+  try { ({ secs, more } = previewSections(k, await sectionsOf(k))); } catch (e) { if (box) box.innerHTML = '<p class="hint">Не се вчита.</p>'; return; }
   if (box) box.innerHTML = normHtml(secs) + (more ? `<p class="hint"><a href="${hrefOf(k)}">Целиот акт →</a></p>` : '');
 }
 function togglePinOpen(k) {
@@ -736,9 +776,14 @@ function renderPins() {
 
 async function copyPins() {
   const parts = [];
-  for (const k of pins) {
-    const { secs } = previewSections(k, await sectionsOf(k, { norm: true }));
-    parts.push(`${citationOf(k)}\n${plainText(normHtml(secs))}`);
+  try {
+    for (const k of pins) {
+      const { secs } = previewSections(k, await sectionsOf(k, { norm: true }));
+      parts.push(`${citationOf(k)}\n${plainText(normHtml(secs))}`);
+    }
+  } catch (e) {
+    toast('Не се вчита, обидете се повторно');
+    return;
   }
   await copyText(parts.join('\n\n'));
   toast(`Копирани: ${pins.length}`);
@@ -883,10 +928,26 @@ function positionPopover(el, rect) {
   el.style.top = top + 'px';
 }
 
+// Footnote ids name their note ("#fn-812-3" is note 812's third footnote), so a footnote is looked up by its id alone.
+// A preview that leaves out its note's footnotes (an act cut after a few членови, an embed) loads them from the note.
+const footnoteNote = (id) => { const m = id.match(/^fn-(\d+)-/); return m ? Number(m[1]) : null; };
 function footnoteTarget(link) {
+  return document.getElementById(decodeURIComponent((link.getAttribute('href') || '').slice(1)));
+}
+async function footnoteHtml(link) {
   const id = decodeURIComponent((link.getAttribute('href') || '').slice(1));
-  const root = link.closest('.pop-body, .note, .pc-body, .embed') || document;
-  return root.querySelector(`[id="${CSS.escape(id)}"]`) || document.getElementById(id);
+  let el = document.getElementById(id);
+  if (!el) {
+    const i = footnoteNote(id);
+    if (i == null || !N[i]) return null;
+    const data = await noteData(i);
+    const fn = data?.sec.find((s) => s.k === 'footnotes');
+    if (!fn) return null;
+    const div = document.createElement('div');
+    div.innerHTML = fn.h;
+    el = div.querySelector(`[id="${CSS.escape(id)}"]`);
+  }
+  return el ? el.innerHTML.replace(/<a[^>]*footnote-backref[^>]*>.*?<\/a>/g, '') : null;
 }
 
 async function openPopover(link, depth) {
@@ -897,10 +958,11 @@ async function openPopover(link, depth) {
   const rect = link.getBoundingClientRect();
 
   if (!link.dataset.k) {
-    const fn = footnoteTarget(link);
-    if (!fn) return;
+    let html = null;
+    try { html = await footnoteHtml(link); } catch (e) { /* offline: no preview */ }
+    if (!html || !link.isConnected || stack.length !== depth - 1) return; // the pointer moved on while it loaded
     el.classList.add('pop-fn');
-    el.innerHTML = `<div class="pop-body">${fn.innerHTML.replace(/<a[^>]*footnote-backref[^>]*>.*?<\/a>/g, '')}</div>`;
+    el.innerHTML = `<div class="pop-body">${html}</div>`;
     popLayer.append(el);
     stack.push(entry);
     positionPopover(el, rect);
@@ -920,9 +982,17 @@ async function openPopover(link, depth) {
   popLayer.append(el);
   stack.push(entry);
   positionPopover(el, rect);
-  const data = await noteData(split(k).i);
+  let data;
+  let secs;
+  let more;
+  try {
+    data = await noteData(split(k).i);
+    ({ secs, more } = previewSections(k, await sectionsOf(k)));
+  } catch (e) {
+    if (stack.includes(entry)) $('.pop-body', el).innerHTML = '<p class="hint">Не се вчита.</p>';
+    return;
+  }
   if (!stack.includes(entry)) return;
-  const { secs, more } = previewSections(k, await sectionsOf(k));
   $('.pop-chips', el).innerHTML = chips(data?.c) + fmLinks(data?.fl);
   $('.pop-body', el).innerHTML = (sectionsHtml(secs) || '<p class="hint">Празно.</p>') +
     (more ? `<p class="hint"><a href="${hrefOf(k)}">Отвори го целиот акт →</a></p>` : '');
@@ -1193,10 +1263,15 @@ async function runSearch() {
     ? top.map((r) => {
         const i = resultNote(r);
         return `<a class="result wl" href="${esc(resultHash(r))}" ${i != null ? `data-k="${i}"` : ''}>
-          <span class="rt">${esc(r.meta.title)}</span>${r.meta.act ? `<span class="ra">${esc(r.meta.act)}</span>` : ''}<span class="rs">${r.excerpt}</span></a>`;
+          <span class="rt">${esc(r.meta.title)}</span>${r.meta.act ? `<span class="ra">${esc(r.meta.act)}</span>` : ''}<span class="rs">${excerptHtml(r.excerpt)}</span></a>`;
       }).join('') + (search.results.length > 30 ? `<div class="more">+ уште ${search.results.length - 30} — стесни го пребарувањето</div>` : '')
     : '<div class="more">Нема резултати.</div>';
 }
+
+// Pagefind returns the excerpt as the record's raw text with its own <mark> tags around the matches, and doesn't escape
+// it. The text is escaped here and only the <mark> tags are kept, so text such as "<1.0 кг/м²" shows as written and
+// nothing in a note can run as HTML in the results.
+const excerptHtml = (x) => String(x).split(/(<\/?mark>)/).map((p) => (p === '<mark>' || p === '</mark>' ? p : esc(p))).join('');
 
 // Pagefind reports a record's URL with a leading "/" ("/#/ГР-01-Член 59"); the site's links are relative ("#/…"),
 // so it also works under a sub-path such as /and_codes/.
