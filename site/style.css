@@ -987,3 +987,10 @@ a.st-bad, .row.st-bad a { color: var(--dim) !important; }
 }
 @supports not selector(::-webkit-scrollbar) { * { scrollbar-width: thin; scrollbar-color: var(--dim) transparent; } }
 @media (max-width: 860px) { :root { --sb: 18px; --sb-dot: 8px; --sb-line: 2px; } }
+
+/* ───────────── studio app links (studio-switch.js) ───────────── */
+/* The links to the other studio apps sit at the right of the top bar; on wide screens the tool panels start below
+   the bar instead of beside it, so the two don't overlap. */
+@media (min-width: 1281px) {
+  .right { grid-row: 2; padding-top: 1mm; }
+}
