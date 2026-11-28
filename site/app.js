@@ -1263,10 +1263,15 @@ async function runSearch() {
     ? top.map((r) => {
         const i = resultNote(r);
         return `<a class="result wl" href="${esc(resultHash(r))}" ${i != null ? `data-k="${i}"` : ''}>
-          <span class="rt">${esc(r.meta.title)}</span>${r.meta.act ? `<span class="ra">${esc(r.meta.act)}</span>` : ''}<span class="rs">${r.excerpt}</span></a>`;
+          <span class="rt">${esc(r.meta.title)}</span>${r.meta.act ? `<span class="ra">${esc(r.meta.act)}</span>` : ''}<span class="rs">${excerptHtml(r.excerpt)}</span></a>`;
       }).join('') + (search.results.length > 30 ? `<div class="more">+ уште ${search.results.length - 30} — стесни го пребарувањето</div>` : '')
     : '<div class="more">Нема резултати.</div>';
 }
+
+// Pagefind returns the excerpt as the record's raw text with its own <mark> tags around the matches, and doesn't escape
+// it. The text is escaped here and only the <mark> tags are kept, so text such as "<1.0 кг/м²" shows as written and
+// nothing in a note can run as HTML in the results.
+const excerptHtml = (x) => String(x).split(/(<\/?mark>)/).map((p) => (p === '<mark>' || p === '</mark>' ? p : esc(p))).join('');
 
 // Pagefind reports a record's URL with a leading "/" ("/#/ГР-01-Член 59"); the site's links are relative ("#/…"),
 // so it also works under a sub-path such as /and_codes/.
