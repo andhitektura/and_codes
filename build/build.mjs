@@ -6,6 +6,7 @@
 // provisions. Notes that keep several членови as headings ("## Член 5") or bare lines are
 // also split into членови, so other vault layouts keep working.
 
+import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -272,7 +273,9 @@ const sectionLabels = new Map(); // "i#anchor" → heading text
 
 function renderNote(n) {
   currentNote = n;
-  const env = {};
+  // Footnote ids carry the note's number ("fn-812-3"), so footnotes stay unique when several notes share the page
+  // (embeds, popovers) and the page can tell which note a footnote belongs to.
+  const env = { docId: String(n.i) };
   const tokens = md.parse(preprocess(n.body, n), env);
 
   // The H1 that repeats the note's label is shown once, as the page title.
@@ -419,14 +422,23 @@ for (const a of acts) {
 
 // ---------- 5. write dist ----------
 
+const json = (o) => JSON.stringify(o, (k, v) => (v instanceof Date ? v.toISOString().slice(0, 10) : v));
+
+// The bundles go into a folder named after their content ("data/3f9a…/b/12.json"). Every build renumbers notes and
+// bundles, so a page that still holds the previous index must never get the new bundles: after a deploy the old
+// folder is gone, the page gets a 404 and reloads instead of showing one член's heading over another's text.
+const bundleJson = [...bundles.values()].map((b) => [b.id, json(b.items)]);
+const ver = crypto.createHash('sha256').update(bundleJson.map(([, t]) => t).join('\u0000')).digest('hex').slice(0, 12);
+const BUNDLES = path.join(DIST, 'data', ver, 'b');
+
 fs.rmSync(DIST, { recursive: true, force: true });
-fs.mkdirSync(path.join(DIST, 'data', 'b'), { recursive: true });
+fs.mkdirSync(BUNDLES, { recursive: true });
 
 const folders = [...new Set(notes.map((n) => n.dir))].sort((a, b) => a.localeCompare(b, 'mk', { numeric: true }));
 const folderIdx = new Map(folders.map((f, i) => [f, i]));
 
-const json = (o) => JSON.stringify(o, (k, v) => (v instanceof Date ? v.toISOString().slice(0, 10) : v));
 const index = {
+  ver,
   site: {
     title: config.title, metaSections: [...META_SECTIONS],
     // The notes outside the themes, as the rail shows them: name, short label, text, icon.
@@ -447,7 +459,7 @@ const index = {
   built: new Date().toISOString(),
 };
 fs.writeFileSync(path.join(DIST, 'data', 'index.json'), json(index));
-for (const b of bundles.values()) fs.writeFileSync(path.join(DIST, 'data', 'b', `${b.id}.json`), json(b.items));
+for (const [id, text] of bundleJson) fs.writeFileSync(path.join(BUNDLES, `${id}.json`), text);
 
 for (const rel of assetFiles) {
   const dest = path.join(DIST, 'files', rel);
